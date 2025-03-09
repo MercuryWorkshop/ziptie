@@ -1,0 +1,26 @@
+{
+  "name": "quickcontainers",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0"
+  },
+  "dependencies": {
+    "@types/w3c-web-usb": "^1.0.10",
+    "@yume-chan/adb": "^1.1.0",
+    "@yume-chan/adb-credential-web": "^1.1.0",
+    "@yume-chan/adb-daemon-webusb": "^1.1.0",
+    "@yume-chan/adb-scrcpy": "^1.1.0",
+    "@yume-chan/fetch-scrcpy-server": "^1.0.0",
+    "@yume-chan/scrcpy": "^1.1.0",
+    "@yume-chan/scrcpy-decoder-webcodecs": "^1.1.0",
+    "@yume-chan/stream-extra": "^1.0.0"
+  }
+}
