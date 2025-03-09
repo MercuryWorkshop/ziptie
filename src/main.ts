@@ -15,6 +15,7 @@ import {
   BitmapVideoFrameRenderer,
   WebCodecsVideoDecoder,
 } from "@yume-chan/scrcpy-decoder-webcodecs";
+import { CodecOptions } from '@yume-chan/scrcpy/esm/1_17/impl';
 
 function createVideoFrameRenderer(): {
   renderer: VideoFrameRenderer;
@@ -131,9 +132,10 @@ document.getElementById("button")!.addEventListener("click", async () => {
       stayAwake: true,
       newDisplay: "1920x1080",
       // Uncomment for codec settings
-      // codecOptions: new CodecOptions({
-      //   profile: H264Capabilities.maxProfile,
-      //   level: H264Capabilities.maxLevel,
+      // videoCodecOptions: new CodecOptions({
+      //   profile: 10,
+      //   level: 10,
+      //   iFrameInterval: 10000,
       // }),
     })
   );
@@ -307,15 +309,10 @@ document.getElementById("button")!.addEventListener("click", async () => {
           action = AndroidMotionEventAction.Down
           break
         case 'pointermove':
-          if (buttons === 0) {
-            action = AndroidMotionEventAction.HoverMove
-          } else {
-            action = AndroidMotionEventAction.Move
-          }
+          action = AndroidMotionEventAction.Move
           break
         case 'pointerup':
           action = AndroidMotionEventAction.Up;
-          console.log("SENDING POINTER UP???");
           break
         default:
           throw new Error(`Unsupported event type: ${type}`)
