@@ -19,6 +19,7 @@
     "@yume-chan/adb-daemon-webusb": "^1.1.0",
     "@yume-chan/adb-scrcpy": "^1.1.0",
     "@yume-chan/fetch-scrcpy-server": "^1.0.0",
+    "@yume-chan/pcm-player": "^1.0.0",
     "@yume-chan/scrcpy": "^1.1.0",
     "@yume-chan/scrcpy-decoder-webcodecs": "^1.1.0",
     "@yume-chan/stream-extra": "^1.0.0"
