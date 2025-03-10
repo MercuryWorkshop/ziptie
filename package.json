@@ -22,6 +22,8 @@
     "@yume-chan/pcm-player": "^1.0.0",
     "@yume-chan/scrcpy": "^1.1.0",
     "@yume-chan/scrcpy-decoder-webcodecs": "^1.1.0",
-    "@yume-chan/stream-extra": "^1.0.0"
+    "@yume-chan/stream-extra": "^1.0.0",
+    "dreamland": "^0.0.25",
+    "vite-plugin-singlefile": "^2.1.0"
   }
 }
