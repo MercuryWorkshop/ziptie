@@ -68,7 +68,7 @@ position: relative;
   const fixDisplay = async (displayId: string) => {
     console.log('displayId', displayId);
     let write = await termuxShell("sh");
-    write(`wm density 250 -d ${displayId}\n`);
+    write(`wm density 200 -d ${displayId}\n`);
 
     // await write(`wm size ${window.innerWidth}x${window.innerHeight} -d ${displayId}\n`);
   }
