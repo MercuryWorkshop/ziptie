@@ -49,18 +49,6 @@ position: relative;
 > video {
   /* height: 100%; */
 }
-#sidebar {
-  height: 6em;
-  width: 1em;
-  background-color: white;
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 2;
-  border: 2px solid black;
-  border-radius: 1em;
-}
 `
 
   let screenWidth = 0;
@@ -311,9 +299,6 @@ position: relative;
 
   return (
     <div>
-      <div id="sidebar" on:click={() => {
-        state.showscreen = false;
-      }} />
     </div>
   )
 }
