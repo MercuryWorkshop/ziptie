@@ -3,6 +3,7 @@ import { connectAdb, displayId, startScrcpy, termuxShell } from './adb';
 import './style.css'
 import "dreamland";
 import { AndroidKeyCode, AndroidKeyEventAction } from '@yume-chan/scrcpy';
+import { Scrcpy } from './scrcpy';
 
 // let prefix = "/data/user/0/com.termux/linuxdeploy-cli";
 // let chrootdir = prefix + "/img";
@@ -51,50 +52,14 @@ async function lxde() {
   await write("startlxde\n");
 }
 
-const Scrcpy: Component<{}, {
-  expanded: boolean,
-}> = function() {
-  this.css = `
-height: 100%;
-width: 100%;
-background-color: red;
-overflow: hidden;
-display: flex;
-position: relative;
-
-> video {
-  /* height: 100%; */
-}
-#sidebar {
-  height: 6em;
-  width: 1em;
-  background-color: white;
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 2;
-  border: 2px solid black;
-  border-radius: 1em;
-}
-`
-  return (
-    <div>
-      <div id="sidebar" on:click={() => {
-        state.showscreen = false;
-      }} />
-    </div>
-  )
-}
-
-const state = $state({
+export const state = $state({
   connected: false,
   showscreen: false,
 });
 
 
 const App: Component<{}, {
-  scrcpy: DLElement<typeof Scrcpy>,
+  scrcpy: ReturnType<typeof Scrcpy>,
   client: AdbScrcpyClient,
 }> = function() {
   this.css = `
@@ -143,20 +108,19 @@ const App: Component<{}, {
 
     this.client = await startScrcpy(this.scrcpy);
 
-    let write = await termuxShell("sh");
-    setTimeout(() => {
-      write(`wm density 250 -d ${displayId}\n`);
-    }, 1000);
-    window.addEventListener("resize", async () => {
-      // await write(`wm size ${window.innerWidth}x${window.innerHeight} -d ${displayId}\n`);
-    });
     state.connected = true;
+    this.scrcpy = <Scrcpy client={this.client} />;
+  }
+  const daemon = async () => {
+    let write = await chrootshell();
+    await write("./a.out\n");
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    this.scrcpy.$.connectdaemon();
   }
 
-  this.scrcpy = <Scrcpy />;
   return <div id="app">
     <div class="container" class:visible={use(state.showscreen)}>
-      {this.scrcpy}
+      {use(this.scrcpy)}
     </div>
     <div class="center">
       <div class="controls">
@@ -164,7 +128,11 @@ const App: Component<{}, {
           <div>
             <button on:click={startx}>startx</button>
             <button on:click={lxde}>lxde</button>
-            <button on:click={() => openApp("com.termux.x11")}>termux</button>
+            <button on:click={daemon}>start anuramouse</button>
+            <button on:click={() => {
+              openApp("com.termux.x11")
+              this.scrcpy.$.showx11 = true;
+            }}>termux</button>
             <button on:click={async () => {
               await this.client.controller!.injectKeyCode({
                 action: AndroidKeyEventAction.Down,
@@ -175,6 +143,7 @@ const App: Component<{}, {
                 keyCode: AndroidKeyCode.AndroidHome,
               });
               state.showscreen = true;
+              this.scrcpy.$.showx11 = false;
             }}>menu</button>
           </div>,
           <button on:click={connect}>connect adb</button>
