@@ -1,13 +1,13 @@
 import { Adb, AdbDaemonTransport, AdbSubprocessNoneProtocol, AdbSubprocessProtocol, AdbSubprocessShellProtocol, AdbSubprocessWaitResult } from '@yume-chan/adb';
 
 import { AdbDaemonWebUsbDevice, AdbDaemonWebUsbDeviceManager } from "@yume-chan/adb-daemon-webusb";
-import { AdbScrcpyClient, AdbScrcpyOptions2_1 } from '@yume-chan/adb-scrcpy';
+import { AdbScrcpyClient, AdbScrcpyExitedError, AdbScrcpyOptions2_1 } from '@yume-chan/adb-scrcpy';
 import { ScrcpyOptions3_1, DefaultServerPath, AndroidKeyCode, AndroidMotionEventAction, AndroidMotionEventButton, ScrcpyAudioCodec } from "@yume-chan/scrcpy";
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import { BIN, VERSION } from "@yume-chan/fetch-scrcpy-server";
 import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcpy";
 
-import { CodecOptions } from '@yume-chan/scrcpy/esm/1_17/impl';
+import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
 
 
 
@@ -49,7 +49,6 @@ export async function connectAdb() {
 }
 
 export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> {
-
   console.log(VERSION); // 2.1
   const server = await fetch(BIN);
   await AdbScrcpyClient.pushServer(adb, server.body as any);
@@ -63,18 +62,24 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
       newDisplay: `${window.innerWidth}x${window.innerHeight}`,
       // Uncomment for codec settings
       videoCodecOptions: new CodecOptions({
-        profile: 10,
+        // profile: 10,
         level: 10,
         iFrameInterval: 10000,
       }),
     })
   );
+  let client;
+  try {
+    client = await AdbScrcpyClient.start(
+      adb,
+      DefaultServerPath,
+      options
+    );
+  } catch (e: any) {
+    console.log(e.output)
+    throw e;
+  }
 
-  const client = await AdbScrcpyClient.start(
-    adb,
-    DefaultServerPath,
-    options
-  );
   return client;
 }
 
@@ -82,17 +87,42 @@ export async function termuxCmdWait(cmd: string): Promise<AdbSubprocessWaitResul
   return await adb.subprocess.spawnAndWait(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
 }
 
+let stdout_pending_data = "";
+let stderr_pending_data = "";
+
 function logProcess(process: AdbSubprocessProtocol) {
   process.stdout.pipeTo(new WritableStream({
     write(packet) {
-      console.log(new TextDecoder().decode(packet));
+      let data = new TextDecoder().decode(packet);
+      let lines = (stdout_pending_data + data).split("\n");
+      stdout_pending_data = lines.pop()!;
+      for (let line of lines) {
+        console.log(line);
+      }
     }
   }) as any);
+  
   process.stderr.pipeTo(new WritableStream({
     write(packet) {
-      console.error(new TextDecoder().decode(packet));
+      let data = new TextDecoder().decode(packet);
+      let lines = (stderr_pending_data + data).split("\n");
+      stderr_pending_data = lines.pop()!;
+      for (let line of lines) {
+        console.error(line);
+      }
     }
   }) as any);
+
+  // process.stdout.pipeTo(new WritableStream({
+  //   write(packet) {
+  //     console.log(new TextDecoder().decode(packet));
+  //   }
+  // }) as any);
+  // process.stderr.pipeTo(new WritableStream({
+  //   write(packet) {
+  //     console.error(new TextDecoder().decode(packet));
+  //   }
+  // }) as any);
 }
 
 export async function prootCmd(cmd: string): Promise<number> {
