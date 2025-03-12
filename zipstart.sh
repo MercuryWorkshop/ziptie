@@ -1,5 +1,5 @@
 #!/bin/bash
-test if packages are installed
+# test if packages are installed
 if ! which termux-x11 && ! which pulseaudio; then
   echo "COULDNT FIND PACKAGES"
 fi
@@ -20,9 +20,13 @@ pacmd load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymou
 ./zipmouse &
 zipmousepid=$!
 
+virgl_test_server_android &
+virglpid=$!
+
 sleep 2 # TODO: WAIT for x and mouse to start
 
 echo "x11pid: $x11pid"
 echo "zipmousepid: $zipmousepid"
+echo "virglpid: $virglpid"
 echo "DONE!"
 echo >pipe
