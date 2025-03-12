@@ -87,10 +87,9 @@ export async function termuxCmdWait(cmd: string): Promise<AdbSubprocessWaitResul
   return await adb.subprocess.spawnAndWait(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
 }
 
-let stdout_pending_data = "";
-let stderr_pending_data = "";
-
 function logProcess(process: AdbSubprocessProtocol) {
+  let stdout_pending_data = "";
+  let stderr_pending_data = "";
   process.stdout.pipeTo(new WritableStream({
     write(packet) {
       let data = new TextDecoder().decode(packet);
@@ -101,7 +100,7 @@ function logProcess(process: AdbSubprocessProtocol) {
       }
     }
   }) as any);
-  
+
   process.stderr.pipeTo(new WritableStream({
     write(packet) {
       let data = new TextDecoder().decode(packet);
@@ -112,17 +111,6 @@ function logProcess(process: AdbSubprocessProtocol) {
       }
     }
   }) as any);
-
-  // process.stdout.pipeTo(new WritableStream({
-  //   write(packet) {
-  //     console.log(new TextDecoder().decode(packet));
-  //   }
-  // }) as any);
-  // process.stderr.pipeTo(new WritableStream({
-  //   write(packet) {
-  //     console.error(new TextDecoder().decode(packet));
-  //   }
-  // }) as any);
 }
 
 export async function prootCmd(cmd: string): Promise<number> {
