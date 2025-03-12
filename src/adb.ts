@@ -63,7 +63,7 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
       newDisplay: `${window.innerWidth}x${window.innerHeight}`,
       // Uncomment for codec settings
       videoCodecOptions: new CodecOptions({
-        profile: 10,
+        // profile: 10,
         level: 10,
         iFrameInterval: 10000,
       }),
