@@ -142,7 +142,6 @@ position: relative;
 
       if (this.showx11) {
         let state = e.type == "keydown" ? 1 : 0;
-        console.log(e.keyCode, state);
         let keyCode = jsToX11Keycode[e.keyCode];
         if (keyCode == undefined) return;
 

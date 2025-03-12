@@ -36,6 +36,7 @@ window.termuxcmd = termuxCmd;
 export const state = $state({
   connected: false,
   showscreen: false,
+  terminal: false,
 });
 
 
@@ -55,6 +56,12 @@ const App: Component<{}, {
     display: none;
   }
   #scrcpycontainer.visible {
+    display: block;
+  }
+  #terminal {
+    display: none;
+  }
+  #terminal.visible {
     display: block;
   }
   .center {
@@ -94,6 +101,7 @@ const App: Component<{}, {
 #sidebar.expanded {
   width: 5em;
   display: flex;
+  border: 2px solid black;
 }
 #handle {
   position: absolute;
@@ -127,6 +135,25 @@ const App: Component<{}, {
     }
     // }
 
+    const term = new Terminal();
+    term.open(document.getElementById("terminal")!);
+
+    let shell = await adb.subprocess.shell("sh");
+    shell.stdout.pipeTo(new WritableStream({
+      write(chunk) {
+        term.write(chunk)
+      }
+    }) as any);
+    shell.stderr.pipeTo(new WritableStream({
+      write(chunk) {
+        term.write(chunk)
+      }
+    }) as any);
+    let writer = shell.stdin.getWriter();
+    term.onData(data => {
+      writer.write(new TextEncoder().encode(data));
+    });
+
     this.client = await startScrcpy(this.scrcpy);
 
     state.connected = true;
@@ -152,7 +179,7 @@ const App: Component<{}, {
 
     this.scrcpy.$.connectdaemon();
 
-
+    // GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0
     prootCmd("PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
   };
 
@@ -169,6 +196,7 @@ const App: Component<{}, {
           <button on:click={() => {
             openApp("com.termux.x11")
             this.scrcpy.$.showx11 = true;
+            state.terminal = false;
           }}>termux</button>
           <button on:click={async () => {
             await this.client.controller!.injectKeyCode({
@@ -180,12 +208,21 @@ const App: Component<{}, {
               keyCode: AndroidKeyCode.AndroidHome,
             });
             state.showscreen = true;
+            state.terminal = false;
             this.scrcpy.$.showx11 = false;
           }}>menu</button>
+          <button on:click={() => {
+            this.scrcpy.$.showx11 = false;
+            state.showscreen = false;
+            state.terminal = true;
+          }}>terminal</button>
         </div>
       </div>
       <div id="scrcpycontainer" class:visible={use(state.showscreen)}>
         {use(this.scrcpy)}
+      </div>
+      <div id="terminal" class:visible={use(state.terminal)}>
+
       </div>
     </div>
     <div class="center">
