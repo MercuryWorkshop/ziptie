@@ -8,7 +8,7 @@ import {
   WebCodecsVideoDecoder,
 } from "@yume-chan/scrcpy-decoder-webcodecs";
 import { adb, termuxShell } from "./adb";
-import { AndroidKeyCode, AndroidKeyEventAction, AndroidMotionEventAction, AndroidMotionEventButton, ScrcpyAudioCodec, ScrcpyControlMessageSerializer, ScrcpyControlMessageWriter } from "@yume-chan/scrcpy";
+import { AndroidKeyCode, AndroidKeyEventAction, AndroidKeyEventMeta, AndroidMotionEventAction, AndroidMotionEventButton, ScrcpyAudioCodec, ScrcpyControlMessageSerializer, ScrcpyControlMessageWriter } from "@yume-chan/scrcpy";
 import { OpusStream } from "./audio";
 import { state } from "./main";
 
@@ -55,8 +55,8 @@ position: relative;
   let screenHeight = 0;
   const fixDisplay = async (displayId: string) => {
     console.log('displayId', displayId);
-    let write = await termuxShell("sh");
-    write(`wm density 200 -d ${displayId}\n`);
+    let result = await adb.subprocess.spawnAndWait(["wm", "density", "150", "-d", displayId.toString()]);
+    console.log(result);
 
     // await write(`wm size ${window.innerWidth}x${window.innerHeight} -d ${displayId}\n`);
   }
@@ -161,12 +161,17 @@ position: relative;
         }
 
         const keyCode = AndroidKeyCode[code as keyof typeof AndroidKeyCode];
+        let metaState = 0;
+        if (e.ctrlKey) metaState |= AndroidKeyEventMeta.Ctrl;
+        if (e.altKey) metaState |= AndroidKeyEventMeta.Alt;
+        if (e.shiftKey) metaState |= AndroidKeyEventMeta.Shift;
+        if (e.metaKey) metaState |= AndroidKeyEventMeta.Meta;
 
         controller.injectKeyCode({
           action,
           keyCode,
           repeat: 0,
-          metaState: 0,
+          metaState,
         });
       }
     }
@@ -404,4 +409,16 @@ const jsToX11Keycode: Record<number, number> = {
   17: 37, // Control (left)
   18: 64, // Alt (left)
   91: 133, // Meta (Super/Windows key)
+  187: 21, // =
+  189: 20, // -
+  192: 49, // `
+  219: 34, // [
+  221: 35, // ]
+  220: 51, // \
+  186: 47, // ;
+  222: 48, // '
+  188: 59, // ,
+  190: 60, // .
+  191: 61, // /
+  45: 118, // Insert
 };

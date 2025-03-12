@@ -1,4 +1,4 @@
-import { Adb, AdbDaemonTransport } from '@yume-chan/adb';
+import { Adb, AdbDaemonTransport, AdbSubprocessNoneProtocol, AdbSubprocessProtocol, AdbSubprocessShellProtocol, AdbSubprocessWaitResult } from '@yume-chan/adb';
 
 import { AdbDaemonWebUsbDevice, AdbDaemonWebUsbDeviceManager } from "@yume-chan/adb-daemon-webusb";
 import { AdbScrcpyClient, AdbScrcpyOptions2_1 } from '@yume-chan/adb-scrcpy';
@@ -11,7 +11,6 @@ import { CodecOptions } from '@yume-chan/scrcpy/esm/1_17/impl';
 
 
 
-const CredentialStore: AdbWebCredentialStore = new AdbWebCredentialStore();
 
 const Manager: AdbDaemonWebUsbDeviceManager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
 
@@ -38,6 +37,8 @@ export async function connectAdb() {
   }
 
   let connection = await connect(device);
+
+  const CredentialStore: AdbWebCredentialStore = new AdbWebCredentialStore("skibidi");
   const transport = await AdbDaemonTransport.authenticate({
     serial: device.serial,
     connection,
@@ -75,6 +76,33 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
     options
   );
   return client;
+}
+
+export async function termuxCmdWait(cmd: string): Promise<AdbSubprocessWaitResult> {
+  return await adb.subprocess.spawnAndWait(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
+}
+
+function logProcess(process: AdbSubprocessProtocol) {
+  process.stdout.pipeTo(new WritableStream({
+    write(packet) {
+      console.log(new TextDecoder().decode(packet));
+    }
+  }) as any);
+  process.stderr.pipeTo(new WritableStream({
+    write(packet) {
+      console.error(new TextDecoder().decode(packet));
+    }
+  }) as any);
+}
+
+export async function prootCmd(cmd: string): Promise<number> {
+  return await termuxCmd(`proot-distro login archlinux --shared-tmp -- ${cmd}`);
+}
+export async function termuxCmd(cmd: string): Promise<number> {
+  let a = await adb.subprocess.spawn(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
+  console.log(a);
+  logProcess(a);
+  return await a.exit;
 }
 
 export async function termuxShell(cmd: string = "run-as com.termux files/usr/bin/bash -lic 'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; bash -i'"): Promise<(cmd: string) => Promise<void>> {

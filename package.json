@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@types/w3c-web-usb": "^1.0.10",
+    "@xterm/xterm": "^5.5.0",
     "@yume-chan/adb": "^1.1.0",
     "@yume-chan/adb-credential-web": "^1.1.0",
     "@yume-chan/adb-daemon-webusb": "^1.1.0",
@@ -24,6 +25,7 @@
     "@yume-chan/scrcpy-decoder-webcodecs": "^1.1.0",
     "@yume-chan/stream-extra": "^1.0.0",
     "dreamland": "^0.0.25",
+    "libcurl.js": "^0.7.0",
     "vite-plugin-singlefile": "^2.1.0"
   }
 }

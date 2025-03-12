@@ -5,5 +5,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["@yume-chan/fetch-scrcpy-server", "@yume-chan/pcm-player"],
   },
-  plugins: [viteSingleFile()]
+  plugins: [
+    viteSingleFile(),
+  ]
 });

@@ -1,5 +1,5 @@
 import { AdbScrcpyClient } from '@yume-chan/adb-scrcpy';
-import { adb, connectAdb, displayId, startScrcpy, termuxShell } from './adb';
+import { adb, connectAdb, displayId, prootCmd, startScrcpy, termuxCmd, termuxShell } from './adb';
 import './style.css'
 import "dreamland";
 import { AndroidKeyCode, AndroidKeyEventAction } from '@yume-chan/scrcpy';
@@ -8,52 +8,30 @@ import { libcurl } from "../out/libcurl_full.mjs";
 import { Terminal } from '@xterm/xterm';
 import { AdbSocket } from '@yume-chan/adb';
 
+
+
+function mkstream(text: string): any {
+  let encoder = new TextEncoder();
+  let uint8array = new Uint8Array(encoder.encode(text));
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(uint8array);
+      controller.close();
+    }
+  });
+}
+
 // let prefix = "/data/user/0/com.termux/linuxdeploy-cli";
 // let chrootdir = prefix + "/img";
 let chrootdir = "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/archlinux";
-async function startx() {
+let tmpdir = "/data/local/tmp";
 
-  let write = await termuxShell();
-  await write(`pkill -f x11\n`);
-  await write(`export TMPDIR=${chrootdir}/tmp\n`);
-  await write("termux-x11 :0\n");
-  write = await termuxShell();
-  await write("pulseaudio --start --exit-idle-time=-1\n");
-  await write(`pacmd load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1\n`);
+import zipmouse from "../zipmouse.c?raw"
+import zipstart from "../zipstart.sh?raw"
 
-};
 window.termuxshell = termuxShell;
+window.termuxcmd = termuxCmd;
 
-
-let rootless = false;
-async function chrootshell() {
-  let write = await termuxShell();
-  // await write(`cd ${prefix}\n`);
-  // if (rootless) {
-  //   await write(`export METHOD=proot\n`);
-  // } else {
-  //   await write(`export METHOD=chroot\n`);
-  // }
-  // await write("export TERM=linux\n");
-  // await write("export TERM=linux\n");
-  // if (!rootless) {
-  //   await write(`tsu\n`);
-  //   await new Promise(resolve => setTimeout(resolve, 1000));
-  // }
-  // await write("./cli.sh -d shell\n");
-
-
-  await write(`proot-distro login archlinux\n`);
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  await write(`export PULSE_SERVER=127.0.0.1\n`);
-  await write(`export DISPLAY=:0\n`);
-
-  return write;
-}
-async function lxde() {
-  let write = await chrootshell();
-  await write("startlxde\n");
-}
 
 export const state = $state({
   connected: false,
@@ -154,12 +132,30 @@ const App: Component<{}, {
     state.connected = true;
     this.scrcpy = <Scrcpy client={this.client} />;
   }
-  const daemon = async () => {
-    let write = await chrootshell();
-    await write("./a.out\n");
-    await new Promise(resolve => setTimeout(resolve, 5000));
+  const startx = async () => {
+    let fs = await adb.sync();
+
+    await fs.write({
+      filename: tmpdir + "/zipmouse.c",
+      file: mkstream(zipmouse)
+    })
+    await fs.write({
+      filename: tmpdir + "/zipstart.sh",
+      file: mkstream(zipstart)
+    });
+
+    await termuxCmd(`rm pipe; mkfifo pipe; sleep 2`);
+    termuxCmd(`bash ${tmpdir}/zipstart.sh`);
+    await termuxCmd(`sleep 2; cat pipe`);
+    console.log("exited?");
+
+
     this.scrcpy.$.connectdaemon();
-  }
+
+
+    prootCmd("PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
+  };
+
 
   return <div id="app">
     <div class="container">
@@ -170,8 +166,6 @@ const App: Component<{}, {
 
         <div class="contents">
           <button on:click={startx}>startx</button>
-          <button on:click={lxde}>lxde</button>
-          <button on:click={daemon}>start anuramouse</button>
           <button on:click={() => {
             openApp("com.termux.x11")
             this.scrcpy.$.showx11 = true;
