@@ -1,6 +1,6 @@
 #!/bin/bash
 
-packages=(gcc termux-x11 pulseaudio pacmd proot-distro xorgproto)
+packages=(clang termux-x11 pulseaudio proot-distro xorgproto)
 for package in "${packages[@]}"; do
   if ! dpkg -l | grep -q "$package"; then
     echo "installing $package"

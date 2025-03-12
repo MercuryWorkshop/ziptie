@@ -7,7 +7,7 @@ import {
   BitmapVideoFrameRenderer,
   WebCodecsVideoDecoder,
 } from "@yume-chan/scrcpy-decoder-webcodecs";
-import { adb, termuxShell } from "./adb";
+import { adb, NO_VIRTUAL_DISPLAY, termuxShell } from "./adb";
 import { AndroidKeyCode, AndroidKeyEventAction, AndroidKeyEventMeta, AndroidMotionEventAction, AndroidMotionEventButton, ScrcpyAudioCodec, ScrcpyControlMessageSerializer, ScrcpyControlMessageWriter } from "@yume-chan/scrcpy";
 import { OpusStream } from "./audio";
 import { state } from "./main";
@@ -57,8 +57,6 @@ position: relative;
     console.log('displayId', displayId);
     let result = await adb.subprocess.spawnAndWait(["wm", "density", "150", "-d", displayId.toString()]);
     console.log(result);
-
-    // await write(`wm size ${window.innerWidth}x${window.innerHeight} -d ${displayId}\n`);
   }
 
   const startAudio = async () => {
@@ -292,6 +290,11 @@ position: relative;
     let renderer = await startVideo();
     await startAudio();
     await startController(renderer.element as HTMLVideoElement, this.client.controller!);
+
+    if (NO_VIRTUAL_DISPLAY) {
+      await adb.subprocess.spawnAndWait(["wm", "size", `${window.innerWidth}x${window.innerHeight}`]);
+      await adb.subprocess.spawnAndWait(["wm", "density", "150"]);
+    }
 
     // @ts-ignore
     window.renderer = renderer;

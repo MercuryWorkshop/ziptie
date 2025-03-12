@@ -10,6 +10,7 @@ import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcp
 import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
 
 
+export const NO_VIRTUAL_DISPLAY = false;
 
 
 const Manager: AdbDaemonWebUsbDeviceManager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
@@ -54,19 +55,17 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
   await AdbScrcpyClient.pushServer(adb, server.body as any);
 
 
-  const options = new AdbScrcpyOptions2_1(
-    new ScrcpyOptions3_1({
-      stayAwake: true,
-      // listApps: true,
-      // newDisplay: "1920x1080",
-      newDisplay: `${window.innerWidth}x${window.innerHeight}`,
-      // Uncomment for codec settings
-      videoCodecOptions: new CodecOptions({
-        // profile: 10,
-        level: 10,
-        iFrameInterval: 10000,
-      }),
+  let opts: ScrcpyOptions3_1.Init = {
+    stayAwake: true,
+    videoCodecOptions: new CodecOptions({
+      level: 10,
+      iFrameInterval: 10000,
     })
+  };
+
+  if (!NO_VIRTUAL_DISPLAY) opts.newDisplay = `${window.innerWidth}x${window.innerHeight}`;
+  const options = new AdbScrcpyOptions2_1(
+    new ScrcpyOptions3_1(opts)
   );
   let client;
   try {
@@ -118,7 +117,6 @@ export async function prootCmd(cmd: string): Promise<number> {
 }
 export async function termuxCmd(cmd: string): Promise<number> {
   let a = await adb.subprocess.spawn(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
-  console.log(a);
   logProcess(a);
   return await a.exit;
 }
