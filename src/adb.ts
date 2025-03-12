@@ -9,8 +9,12 @@ import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcp
 
 import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
 
-
-export const NO_VIRTUAL_DISPLAY = false;
+export enum VirtualDisplayMode {
+  None,
+  Internal,
+  Shell,
+}
+export const VIRTUAL_DISPLAY_MODE: VirtualDisplayMode = VirtualDisplayMode.Shell;
 
 
 const Manager: AdbDaemonWebUsbDeviceManager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
@@ -49,10 +53,29 @@ export async function connectAdb() {
   window.adb = adb;
 }
 
+export async function getDisplayIds(): Promise<number[]> {
+  let displayinfo = await adb.subprocess.spawnAndWait(["dumpsys", "display"]);
+  console.log(displayinfo);
+
+  let selector = /mDisplayId=(\d+)/g;
+
+  let unique = new Set<number>();
+  let match;
+
+  do {
+    match = selector.exec(displayinfo.stdout);
+    if (match) {
+      unique.add(parseInt(match[1]));
+    }
+  } while (match);
+  return Array.from(unique);
+}
+
 export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> {
   console.log(VERSION); // 2.1
   const server = await fetch(BIN);
   await AdbScrcpyClient.pushServer(adb, server.body as any);
+
 
 
   let opts: ScrcpyOptions3_1.Init = {
@@ -63,7 +86,39 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
     })
   };
 
-  if (!NO_VIRTUAL_DISPLAY) opts.newDisplay = `${window.innerWidth}x${window.innerHeight}`;
+  if (VIRTUAL_DISPLAY_MODE == VirtualDisplayMode.Shell) {
+    // create virtual displays the official way
+    opts.newDisplay = `${window.innerWidth}x${window.innerHeight}`;
+  } else if (VIRTUAL_DISPLAY_MODE == VirtualDisplayMode.Internal) {
+    // VIRTUAL_DISPLAY_FLAG_TRUSTED was revoked from adb shell in android 15
+    // create virtual displays by abusing overlay_display_devices
+
+    if ((await adb.subprocess.spawnAndWait(["settings", "put", "global", "overlay_display_devices", "null"])).exitCode != 0) throw new Error("fail");
+    let oldDisplayIds = await getDisplayIds();
+
+    // create an overlay with a very small size so that it doesn't interfere with the main display too much
+    // JANK JANK JANK todo figure out what numbers it accepts
+    if ((await adb.subprocess.spawnAndWait(["settings", "put", "global", "overlay_display_devices", "800x100/600"])).exitCode != 0) throw new Error("fail");
+    let displayIds = await getDisplayIds();
+    let newDisplayIds = displayIds.filter(x => !oldDisplayIds.includes(x));
+    if (newDisplayIds.length != 1) throw new Error("something went wrong creating screens");
+    let displayId = newDisplayIds[0];
+    console.log("displayId", displayId);
+
+    // after creating we can resize it and it won't change the overlay size
+    await adb.subprocess.spawnAndWait(["wm", "size", `${window.innerWidth}x${window.innerHeight}`, "-d", displayId.toString()]);
+    await adb.subprocess.spawnAndWait(["wm", "density", "150", "-d", displayId.toString()]);
+
+    // systemui doesn't run on these displays for some reason
+    await adb.subprocess.spawnAndWait(["am", "start", "-n", "com.google.android.apps.nexuslauncher/.NexusLauncherActivity", "--display", displayId.toString()]);
+
+    opts.displayId = displayId;
+  } else if (VIRTUAL_DISPLAY_MODE == VirtualDisplayMode.None) {
+    // use the main display
+    await adb.subprocess.spawnAndWait(["wm", "reset"]);
+    await adb.subprocess.spawnAndWait(["wm", "size", `${window.innerWidth}x${window.innerHeight}`]);
+    await adb.subprocess.spawnAndWait(["wm", "density", "150"]);
+  }
   const options = new AdbScrcpyOptions2_1(
     new ScrcpyOptions3_1(opts)
   );
