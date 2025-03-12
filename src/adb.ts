@@ -1,13 +1,13 @@
 import { Adb, AdbDaemonTransport, AdbSubprocessNoneProtocol, AdbSubprocessProtocol, AdbSubprocessShellProtocol, AdbSubprocessWaitResult } from '@yume-chan/adb';
 
 import { AdbDaemonWebUsbDevice, AdbDaemonWebUsbDeviceManager } from "@yume-chan/adb-daemon-webusb";
-import { AdbScrcpyClient, AdbScrcpyOptions2_1 } from '@yume-chan/adb-scrcpy';
+import { AdbScrcpyClient, AdbScrcpyExitedError, AdbScrcpyOptions2_1 } from '@yume-chan/adb-scrcpy';
 import { ScrcpyOptions3_1, DefaultServerPath, AndroidKeyCode, AndroidMotionEventAction, AndroidMotionEventButton, ScrcpyAudioCodec } from "@yume-chan/scrcpy";
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
 import { BIN, VERSION } from "@yume-chan/fetch-scrcpy-server";
 import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcpy";
 
-import { CodecOptions } from '@yume-chan/scrcpy/esm/1_17/impl';
+import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
 
 
 
@@ -49,7 +49,6 @@ export async function connectAdb() {
 }
 
 export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> {
-
   console.log(VERSION); // 2.1
   const server = await fetch(BIN);
   await AdbScrcpyClient.pushServer(adb, server.body as any);
@@ -69,12 +68,18 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
       }),
     })
   );
+  let client;
+  try {
+    client = await AdbScrcpyClient.start(
+      adb,
+      DefaultServerPath,
+      options
+    );
+  } catch (e: any) {
+    console.log(e.output)
+    throw e;
+  }
 
-  const client = await AdbScrcpyClient.start(
-    adb,
-    DefaultServerPath,
-    options
-  );
   return client;
 }
 
