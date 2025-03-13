@@ -224,9 +224,7 @@ iframe {
       {$if(use(this.shown, s => s == "terminal"),
         terminal
       )}
-      {$if(use(this.shown, s => s == "code"),
-        <iframe bind:this={use(this.codeframe)} />
-      )}
+      <iframe bind:this={use(this.codeframe)} class:visible={use(this.shown, s => s == "code")} />
     </div>
     {$if(use(state.connected, s => !s),
       <div class="center">
