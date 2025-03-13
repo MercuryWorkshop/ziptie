@@ -80,13 +80,13 @@ class AdbSocketWS extends EventTarget {
 }
 
 
-async function proxyInitLibcurl() {
+export async function proxyInitLibcurl() {
   await libcurl.load_wasm();
   libcurl.transport = AdbSocketWS;
   libcurl.set_websocket("ws://dummy");
 }
 
-async function proxyLoadPage(iframe: HTMLIFrameElement, server: string, url: string) {
+export async function proxyLoadPage(iframe: HTMLIFrameElement, server: string, url: string) {
   let h = await libcurl.fetch(url);
   let html = await h.text();
   let doc = new DOMParser().parseFromString(html, 'text/html');

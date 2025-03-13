@@ -27,6 +27,7 @@ let tmpdir = "/data/local/tmp";
 import zipmouse from "../zipmouse.c?raw"
 import zipstart from "../zipstart.sh?raw"
 import { Terminal } from './Terminal';
+import { proxyInitLibcurl, proxyLoadPage } from './proxy';
 
 window.termuxshell = termuxShell;
 window.termuxcmd = termuxCmd;
@@ -43,10 +44,12 @@ const App: Component<{}, {
   client: AdbScrcpyClient,
   expanded: boolean,
   shown: "scrcpy" | "terminal" | "code",
+  codeframe: HTMLIFrameElement
 }> = function() {
   this.css = `
-
+overflow: hidden;
   .container {
+    overflow: hidden;
     position: absolute;
     width: 100%;
     height: 100%;
@@ -114,7 +117,11 @@ const App: Component<{}, {
 
   border-top-right-radius: 1em;
   border-bottom-right-radius: 1em;
-
+}
+iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
 }
   `
 
@@ -203,6 +210,12 @@ const App: Component<{}, {
             this.shown = "code";
             this.scrcpy.$.showx11 = false;
           }}>code</button>
+          <button on:click={async () => {
+            // prootCmd("code-server --auth none");
+            console.log("loading page");
+            await proxyInitLibcurl();
+            await proxyLoadPage(this.codeframe, "http://localhost:8080", "http://localhost:8080");
+          }}>start codeserver</button>
         </div>
       </div>
       <div id="scrcpycontainer" class:visible={use(this.shown, s => s == "scrcpy")}>
@@ -210,6 +223,9 @@ const App: Component<{}, {
       </div>
       {$if(use(this.shown, s => s == "terminal"),
         terminal
+      )}
+      {$if(use(this.shown, s => s == "code"),
+        <iframe bind:this={use(this.codeframe)} />
       )}
     </div>
     {$if(use(state.connected, s => !s),

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-packages=(clang termux-x11 pulseaudio proot-distro xorgproto)
+packages=(clang termux-x11 pulseaudio proot-distro xorgproto virglrenderer-android)
 for package in "${packages[@]}"; do
   if ! dpkg -l | grep -q "$package"; then
     echo "installing $package"
