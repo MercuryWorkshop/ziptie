@@ -241,167 +241,90 @@ const App: Component<{}, {
     </div>
   </div>
 }
+sandstone.libcurl.transport = class extends EventTarget {
+  binaryType = "arraybuffer";
+  stream = null;
+  event_listeners = {};
+  connection = null;
+
+  onopen = () => { };
+  onerror = () => { };
+  onmessage: any = () => { };
+  onclose = () => { };
+
+  CONNECTING = 0;
+  OPEN = 1;
+  CLOSING = 2;
+  CLOSED = 3;
+  url: string;
+  protocols: string[];
+  readyState = 0;
+  socket: AdbSocket = null!;
+  writer: WritableStreamDefaultWriter<any> = null!;
+  constructor(url: string, protocols: string[]) {
+    super();
+
+    this.url = url;
+    this.protocols = protocols
+
+    let [host, port] = new URL(url).pathname.substring(1).split(":");
+    if (host != "localhost" && host != "127.0.0.1") {
+      throw new Error("libcurl tried connecting to " + host);
+    }
+
+    console.log("connecting to (tcp:" + port + ")");
+    adb.createSocket("tcp:" + port).then(socket => {
+      this.socket = socket;
+      this.writer = socket.writable.getWriter();
+      this.socket.readable.pipeTo(new WritableStream({
+        write: (chunk) => {
+          let data = chunk;
+          this.dispatchEvent(new MessageEvent("message", {
+            data: data.buffer,
+          }));
+          this.onmessage({ data: data.buffer });
+        }
+      }) as any);
+      socket.closed.then(() => {
+        this.readyState = 3;
+        this.dispatchEvent(new Event("close"));
+        this.onclose();
+      });
+      this.readyState = 1;
+      this.dispatchEvent(new Event("open"));
+      this.onopen();
+    });
+  }
+
+  send(data: ArrayBuffer) {
+    // this.writer.write(new TextEncoder().encode(`GET / HTTP/1.1\nHost: localhost:8080\nUser-Agent: curl/8.11.1\nAccept: */*\n\n`));
+    this.writer.write(new Uint8Array(data));
+  }
+  get bufferedAmount() {
+    let total = 0;
+    return total;
+  }
+
+  get extensions() {
+    return "";
+  }
+
+  get protocol() {
+    return "binary";
+  }
+}
+sandstone.libcurl.set_websocket("ws://dummy");
+
 
 let roott;
 async function loadPage(server: string, url: string) {
-  let h = await libcurl.fetch(url);
-  let html = await h.text();
-  console.log(html);
-  let doc = new DOMParser().parseFromString(html, 'text/html');
-
-  let scripts = doc.querySelectorAll('script');
-  for (let script of scripts) {
-    if (!script.src) continue;
-    let src = new URL(script.src).pathname;
-    if (src == "/") continue;
-    let res = await libcurl.fetch(server + src);
-    let text = await res.text();
-    text = text.replaceAll("location.href", "newlocation.href");
-    let blob = new Blob([text], { type: "application/javascript" });
-    let data = URL.createObjectURL(blob);
-    script.src = data;
-  }
-  let styles = doc.querySelectorAll('link[rel="stylesheet"]') as NodeListOf<HTMLLinkElement>;
-  for (let style of styles) {
-    let src = new URL(style.href).pathname;
-    if (src == "/") continue;
-    let res = await libcurl.fetch(server + src);
-    let text = await res.blob();
-    let data = URL.createObjectURL(text);
-    style.href = data;
-  }
-
-  let newhtml = doc.documentElement.innerHTML;
-  let iframe = document.createElement('iframe');
-  iframe.style.width = "100%";
-  iframe.style.height = "100%";
-  (roott || document.getElementById("app")!).replaceWith(iframe);
-  roott = iframe;
-
-  iframe.contentWindow!.window.WebSocket = new Proxy(WebSocket, {
-    construct(target, args) {
-      let url = new URL(args[0]);
-
-      console.log("ws://127.0.0.1:8080" + url.pathname + "?" + url.searchParams);
-      let socket = new libcurl.WebSocket("ws://127.0.0.1:8080" + url.pathname + "?" + url.searchParams);
-      socket.binaryType = "arraybuffer";
-      let om;
-
-      socket.__defineSetter__("onmessage", t => om = t);
-      socket.__defineGetter__("onmessage", () => (e) => {
-        let d = e.data;
-        e.__defineGetter__("data", () => new Blob([d]));
-      });
-
-      return socket;
-    }
-  });
-
-  iframe.contentWindow!.fetch = (...args) => {
-    args[0] = new URL(args[0].toString());
-    args[0].host = "localhost:8080";
-    console.log(args);
-    return libcurl.fetch(args[0].toString(), ...args.slice(1));
-  };
-
-  iframe.contentDocument!.open();
-  iframe.contentDocument!.write(newhtml);
-  iframe.contentDocument!.close();
-  const newlocation = {
-    get href() {
-      return url;
-    },
-    set href(value) {
-      console.log("SETTER", value);
-      loadPage(server, server + new URL(value).pathname + "?" + new URL(value).searchParams);
-    }
-  };
-  iframe.contentWindow!.window.newlocation = newlocation;
-  iframe.contentWindow!.document.newlocation = newlocation;
-  iframe.contentWindow!.navigation.addEventListener("navigate", (event) => {
-    debugger;
-    console.log(event);
-    event.intercept();
-  }, { capture: true });
+  const main_frame = new sandstone.controller.ProxyFrame();
+  document.getElementById("app")!.replaceWith(main_frame.iframe);
+  main_frame.navigate_to(url);
 }
 
-window.libcurl = libcurl;
+window.ss = sandstone;
 window.trylibcurl = async () => {
-  await libcurl.load_wasm();
-  libcurl.transport = class extends EventTarget {
-    binaryType = "arraybuffer";
-    stream = null;
-    event_listeners = {};
-    connection = null;
-
-    onopen = () => { };
-    onerror = () => { };
-    onmessage: any = () => { };
-    onclose = () => { };
-
-    CONNECTING = 0;
-    OPEN = 1;
-    CLOSING = 2;
-    CLOSED = 3;
-    url: string;
-    protocols: string[];
-    readyState = 0;
-    socket: AdbSocket = null!;
-    writer: WritableStreamDefaultWriter<any> = null!;
-    constructor(url: string, protocols: string[]) {
-      super();
-
-      this.url = url;
-      this.protocols = protocols
-
-      let [host, port] = new URL(url).pathname.substring(1).split(":");
-      if (host != "localhost" && host != "127.0.0.1") {
-        throw new Error("libcurl tried connecting to " + host);
-      }
-
-      console.log("connecting to (tcp:" + port + ")");
-      adb.createSocket("tcp:" + port).then(socket => {
-        this.socket = socket;
-        this.writer = socket.writable.getWriter();
-        this.socket.readable.pipeTo(new WritableStream({
-          write: (chunk) => {
-            let data = chunk;
-            this.dispatchEvent(new MessageEvent("message", {
-              data: data.buffer,
-            }));
-            this.onmessage({ data: data.buffer });
-          }
-        }) as any);
-        socket.closed.then(() => {
-          this.readyState = 3;
-          this.dispatchEvent(new Event("close"));
-          this.onclose();
-        });
-        this.readyState = 1;
-        this.dispatchEvent(new Event("open"));
-        this.onopen();
-      });
-    }
-
-    send(data: ArrayBuffer) {
-      // this.writer.write(new TextEncoder().encode(`GET / HTTP/1.1\nHost: localhost:8080\nUser-Agent: curl/8.11.1\nAccept: */*\n\n`));
-      this.writer.write(new Uint8Array(data));
-    }
-    get bufferedAmount() {
-      let total = 0;
-      return total;
-    }
-
-    get extensions() {
-      return "";
-    }
-
-    get protocol() {
-      return "binary";
-    }
-  }
-  console.log(libcurl);
-  libcurl.set_websocket("ws://dummy");
 
   let server = 'http://localhost:8080';
   loadPage(server, server);
