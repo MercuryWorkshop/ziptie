@@ -4,10 +4,9 @@ import './style.css'
 import "dreamland";
 import { AndroidKeyCode, AndroidKeyEventAction } from '@yume-chan/scrcpy';
 import { Scrcpy } from './scrcpy';
-// import { libcurl } from "../out/libcurl_full.mjs";
+import { libcurl } from "../out/libcurl_full.mjs";
 import { Terminal } from '@xterm/xterm';
 import { AdbSocket } from '@yume-chan/adb';
-import * as sandstone from "../sandstone/dist/sandstone.mjs";
 
 
 
@@ -266,8 +265,25 @@ async function loadPage(server: string, url: string) {
     let src = new URL(style.href).pathname;
     if (src == "/") continue;
     let res = await libcurl.fetch(server + src);
-    let text = await res.blob();
-    let data = URL.createObjectURL(text);
+    let text = await res.text();
+    let urlregex = /url\(([^)]+)\)/g;
+
+    while (true) {
+      let match = urlregex.exec(text);
+      if (!match) break;
+      console.log(match);
+      if (match[1].startsWith("data:")) continue;
+      let _url = new URL(match[1], res.url);
+      console.log(_url);
+      let res2 = await libcurl.fetch(_url.toString());
+      if (!res2.ok) console.error(res2);
+      let blob = await res2.blob();
+      let data = URL.createObjectURL(blob);
+      text = text.replace(match[1], data);
+    }
+
+    let blob = new Blob([text], { type: "text/css" });
+    let data = URL.createObjectURL(blob);
     style.href = data;
   }
 
@@ -278,9 +294,11 @@ async function loadPage(server: string, url: string) {
   (roott || document.getElementById("app")!).replaceWith(iframe);
   roott = iframe;
 
-  iframe.contentWindow!.window.WebSocket = new Proxy(WebSocket, {
+  let cw = iframe.contentWindow!.window;
+  cw.WebSocket = new Proxy(WebSocket, {
     construct(target, args) {
       let url = new URL(args[0]);
+      console.log(args);
 
       console.log("ws://127.0.0.1:8080" + url.pathname + "?" + url.searchParams);
       let socket = new libcurl.WebSocket("ws://127.0.0.1:8080" + url.pathname + "?" + url.searchParams);
@@ -297,12 +315,30 @@ async function loadPage(server: string, url: string) {
     }
   });
 
-  iframe.contentWindow!.fetch = (...args) => {
+  cw.fetch = (...args) => {
     args[0] = new URL(args[0].toString());
     args[0].host = "localhost:8080";
-    console.log(args);
     return libcurl.fetch(args[0].toString(), ...args.slice(1));
   };
+
+  cw.HTMLScriptElement.prototype.setAttribute = function(name, value) {
+    if (name == "src") {
+      console.log("SET SRC", value);
+      let newurl = server + new URL(value).pathname + "?" + new URL(value).searchParams;
+      let url = new URL(newurl);
+      if (url.protocol == "http:" || url.protocol == "https:") {
+        console.log("fetching", value);
+        libcurl.fetch(newurl).then(async res => {
+          let text = await res.text();
+          let blob = new Blob([text], { type: "application/javascript" });
+          let data = URL.createObjectURL(blob);
+          this.src = data;
+        });
+      }
+    }
+  }
+  // i don't feel like it
+  delete cw.Worker;
 
   iframe.contentDocument!.open();
   iframe.contentDocument!.write(newhtml);
@@ -316,13 +352,8 @@ async function loadPage(server: string, url: string) {
       loadPage(server, server + new URL(value).pathname + "?" + new URL(value).searchParams);
     }
   };
-  iframe.contentWindow!.window.newlocation = newlocation;
-  iframe.contentWindow!.document.newlocation = newlocation;
-  iframe.contentWindow!.navigation.addEventListener("navigate", (event) => {
-    debugger;
-    console.log(event);
-    event.intercept();
-  }, { capture: true });
+  cw.window.newlocation = newlocation;
+  cw.document.newlocation = newlocation;
 }
 
 window.libcurl = libcurl;
@@ -359,7 +390,7 @@ window.trylibcurl = async () => {
         throw new Error("libcurl tried connecting to " + host);
       }
 
-      console.log("connecting to (tcp:" + port + ")");
+      console.error("connecting to (tcp:" + port + ")");
       adb.createSocket("tcp:" + port).then(socket => {
         this.socket = socket;
         this.writer = socket.writable.getWriter();
