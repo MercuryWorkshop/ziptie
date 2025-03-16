@@ -94,8 +94,9 @@ export async function proxyLoadPage(iframe: HTMLIFrameElement, server: string, u
   let scripts = doc.querySelectorAll('script');
   for (let script of scripts) {
     if (!script.src) continue;
-    let src = new URL(script.src).pathname;
+    let src = new URL(script.getAttribute("src")!, url).pathname;
     if (src == "/") continue;
+    console.log("fetching", server + src);
     let res = await libcurl.fetch(server + src);
     let text = await res.text();
     text = text.replaceAll("location.href", "newlocation.href");
@@ -105,7 +106,7 @@ export async function proxyLoadPage(iframe: HTMLIFrameElement, server: string, u
   }
   let styles = doc.querySelectorAll('link[rel="stylesheet"]') as NodeListOf<HTMLLinkElement>;
   for (let style of styles) {
-    let src = new URL(style.href).pathname;
+    let src = new URL(style.getAttribute("href")!, url).pathname;
     if (src == "/") continue;
     let res = await libcurl.fetch(server + src);
     let text = await res.text();
@@ -152,6 +153,7 @@ export async function proxyLoadPage(iframe: HTMLIFrameElement, server: string, u
   });
 
   cw.fetch = (...args) => {
+    console.log("fetch", args);
     args[0] = new URL(args[0].toString());
     args[0].host = "localhost:8080";
     return libcurl.fetch(args[0].toString(), ...args.slice(1));
@@ -185,7 +187,7 @@ export async function proxyLoadPage(iframe: HTMLIFrameElement, server: string, u
     },
     set href(value) {
       console.log("NAVIGATING TO", value);
-      loadPage(iframe, server, server + new URL(value).pathname + "?" + new URL(value).searchParams);
+      proxyLoadPage(iframe, server, server + new URL(value).pathname + "?" + new URL(value).searchParams);
     }
   };
 

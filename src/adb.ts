@@ -1,4 +1,4 @@
-import { Adb, AdbDaemonTransport, AdbSubprocessNoneProtocol, AdbSubprocessProtocol, AdbSubprocessShellProtocol, AdbSubprocessWaitResult } from '@yume-chan/adb';
+import { Adb, AdbDaemonDevice, AdbDaemonTransport, AdbPacket, AdbPacketSerializeStream, AdbServerClient, AdbServerTransport, AdbSubprocessNoneProtocol, AdbSubprocessProtocol, AdbSubprocessShellProtocol, AdbSubprocessWaitResult } from '@yume-chan/adb';
 
 import { AdbDaemonWebUsbDevice, AdbDaemonWebUsbDeviceManager } from "@yume-chan/adb-daemon-webusb";
 import { AdbScrcpyClient, AdbScrcpyExitedError, AdbScrcpyOptions2_1 } from '@yume-chan/adb-scrcpy';
@@ -8,6 +8,7 @@ import { BIN, VERSION } from "@yume-chan/fetch-scrcpy-server";
 import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcpy";
 
 import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
+import { MaybeConsumable, MaybeConsumable, pipeFrom, PushReadableStream, ReadableStream, StructDeserializeStream, WrapReadableStream, WrapWritableStream } from '@yume-chan/stream-extra';
 
 export enum VirtualDisplayMode {
   None,
@@ -35,13 +36,76 @@ export async function connect(device: AdbDaemonWebUsbDevice) {
 
 export let adb: Adb;
 
-export async function connectAdb() {
-  const device: AdbDaemonWebUsbDevice | undefined = await Manager.requestDevice();
-  if (!device) {
-    throw new Error("No device selected");
+declare const WebSocketStream: any;
+
+class AdbDaemonWebsocketDevice implements AdbDaemonDevice {
+  static isSupported(): boolean {
+    return true;
   }
 
+  readonly serial: string;
+
+  get name(): string | undefined {
+    return this.address;
+  }
+
+  constructor(private address: string) {
+    this.serial = address;
+  }
+
+  async connect() {
+    const socket = new WebSocketStream(this.address);
+    const { readable, writable } = await socket.opened;
+    let writer = writable.getWriter();
+    const reader = readable.getReader();
+
+
+    return {
+      readable: new WrapReadableStream(new ReadableStream({
+        pull(controller) {
+          reader.read().then(({ value, done }: any) => {
+            if (done) {
+              controller.close();
+              return;
+            }
+            controller.enqueue(new Uint8Array(value));
+          });
+        }
+      })).pipeThrough(new StructDeserializeStream(AdbPacket) as any),
+      writable: pipeFrom(
+        new MaybeConsumable.WritableStream({
+          write(packet: any) {
+            writer.write(packet);
+          },
+          close() {
+            writable.close();
+          },
+        }),
+        new AdbPacketSerializeStream(),
+      )
+    } as any;
+  }
+}
+
+export async function connectAdb() {
+  Manager.trackDevices();
+
+  let devices = await Manager.getDevices();
+  let device: AdbDaemonWebUsbDevice | undefined;
+  if (devices.length == 1) {
+    device = devices[0];
+  } else {
+    device = await Manager.requestDevice();
+    if (!device) {
+      throw new Error("No device selected");
+    }
+  }
   let connection = await connect(device);
+
+  // const device = new AdbDaemonWebsocketDevice("ws://10.0.1.163:8080");
+  // let connection = await device.connect();
+
+  console.log("connected");
 
   const CredentialStore: AdbWebCredentialStore = new AdbWebCredentialStore("skibidi");
   const transport = await AdbDaemonTransport.authenticate({
@@ -49,6 +113,7 @@ export async function connectAdb() {
     connection,
     credentialStore: CredentialStore
   });
+  console.log("authenticated");
   adb = new Adb(transport);
   window.adb = adb;
 }
@@ -80,8 +145,9 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
 
   let opts: ScrcpyOptions3_1.Init = {
     stayAwake: true,
+    videoBitRate: 1,
     videoCodecOptions: new CodecOptions({
-      level: 10,
+      level: 1,
       iFrameInterval: 10000,
     })
   };
