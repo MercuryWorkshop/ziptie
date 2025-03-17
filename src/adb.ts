@@ -146,6 +146,9 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
   let opts: ScrcpyOptions3_1.Init = {
     stayAwake: true,
     videoBitRate: 1,
+    clipboardAutosync: true,
+    control: true,
+    audio: true,
     videoCodecOptions: new CodecOptions({
       level: 1,
       iFrameInterval: 10000,
@@ -188,6 +191,7 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
   const options = new AdbScrcpyOptions2_1(
     new ScrcpyOptions3_1(opts)
   );
+
   let client;
   try {
     client = await AdbScrcpyClient.start(
@@ -199,6 +203,29 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
     console.log(e.output)
     throw e;
   }
+
+  options.clipboard?.pipeTo(
+    new WritableStream({
+      write(packet: string) {
+        navigator.clipboard.writeText(packet);
+      }
+    }) as any
+  );
+
+  let oldClipboard = "";
+  setInterval(async () => {
+    try {
+      let clipboard = await navigator.clipboard.readText();
+      if (clipboard == oldClipboard) return;
+      client.controller!.setClipboard({
+        sequence: 0n,
+        paste: false,
+        content: clipboard,
+      });
+      oldClipboard = clipboard;
+    } catch { }
+  }, 500);
+
 
   return client;
 }
