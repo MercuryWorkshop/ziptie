@@ -13,6 +13,9 @@ export const Terminal: Component<{}, {
     width: 100%;
     height: 100%;
   }
+  .xterm-scroll-area {
+    display:none;
+  }
   `
 
   this.start = async () => {

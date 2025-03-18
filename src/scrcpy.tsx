@@ -132,13 +132,12 @@ position: relative;
 
   const startController = async (video: HTMLVideoElement, controller: ScrcpyControlMessageWriter) => {
     const injectKeyCode = (e: KeyboardEvent) => {
-      // if (e.target != video) return;
-      e.preventDefault()
-      e.stopPropagation()
-
       const { type, code } = e
 
       if (this.showx11) {
+        e.preventDefault()
+        e.stopPropagation()
+
         let state = e.type == "keydown" ? 1 : 0;
         let keyCode = jsToX11Keycode[e.keyCode];
         if (keyCode == undefined) return;
