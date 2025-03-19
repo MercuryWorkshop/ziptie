@@ -32,6 +32,8 @@ export const Terminal: Component<{}, {
 
     term.open(this.term);
     fit.fit();
+    setInterval(() => fit.fit(), 1000); //xterm sucks blah blah blah
+    console.log(fit, term)
 
     let shell = await adb.subprocess.shell("sh");
     shell.stdout.pipeTo(new WritableStream({
