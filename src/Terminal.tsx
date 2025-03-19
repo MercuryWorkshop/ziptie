@@ -1,5 +1,10 @@
 import { Terminal as XtermTerminal } from '@xterm/xterm';
 import { adb } from './adb';
+import { FitAddon } from '@xterm/addon-fit';
+import { ClipboardAddon } from '@xterm/addon-clipboard';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+
+import "@xterm/xterm/css/xterm.css";
 
 export const Terminal: Component<{}, {
   term: HTMLElement,
@@ -13,14 +18,20 @@ export const Terminal: Component<{}, {
     width: 100%;
     height: 100%;
   }
-  .xterm-scroll-area {
-    display:none;
-  }
   `
 
   this.start = async () => {
     const term = new XtermTerminal();
+
+    const fit = new FitAddon();
+    const clip = new ClipboardAddon();
+    const links = new WebLinksAddon();
+    term.loadAddon(fit);
+    term.loadAddon(clip);
+    term.loadAddon(links);
+
     term.open(this.term);
+    fit.fit();
 
     let shell = await adb.subprocess.shell("sh");
     shell.stdout.pipeTo(new WritableStream({
