@@ -21,7 +21,7 @@ function mkstream(text: string): any {
 
 // let prefix = "/data/user/0/com.termux/linuxdeploy-cli";
 // let chrootdir = prefix + "/img";
-let chrootdir = "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/archlinux";
+let chrootdir = "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/debian";
 let tmpdir = "/data/local/tmp";
 
 import zipmouse from "../zipmouse.c?raw"

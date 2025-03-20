@@ -261,7 +261,7 @@ function logProcess(process: AdbSubprocessProtocol) {
 }
 
 export async function prootCmd(cmd: string): Promise<number> {
-  return await termuxCmd(`proot-distro login archlinux --shared-tmp -- ${cmd}`);
+  return await termuxCmd(`proot-distro login debian --shared-tmp -- ${cmd}`);
 }
 export async function termuxCmd(cmd: string): Promise<number> {
   let a = await adb.subprocess.spawn(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
