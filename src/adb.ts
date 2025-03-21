@@ -9,6 +9,7 @@ import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcp
 
 import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
 import { MaybeConsumable, MaybeConsumable, pipeFrom, PushReadableStream, ReadableStream, StructDeserializeStream, WrapReadableStream, WrapWritableStream } from '@yume-chan/stream-extra';
+import { Logcat, AndroidLogEntry } from '@yume-chan/android-bin';
 
 export enum VirtualDisplayMode {
   None,
@@ -188,6 +189,31 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
     await adb.subprocess.spawnAndWait(["wm", "size", `${window.innerWidth}x${window.innerHeight}`]);
     await adb.subprocess.spawnAndWait(["wm", "density", "150"]);
   }
+
+  const logcat = new Logcat(adb);
+  logcat.binary().pipeTo(new WritableStream({
+    write(packet: AndroidLogEntry) {
+      if (packet.tag.includes("ziptie") || packet.tag.includes("ServerService"))
+        console.log(packet.message, packet.tag);
+    }
+  }) as any);
+
+  console.log(await adb.subprocess.spawnAndWait("am start-service -n org.mercuryworkshop.ziptieserver/.ServerService"));
+
+  await new Promise(resolve => setTimeout(resolve, 5000));
+  let socket = await adb.createSocket("localabstract:ziptie");
+  let writer = socket.writable.getWriter();
+  let te = new TextEncoder();
+  let td = new TextDecoder();
+  writer.write(te.encode("hello\n"));
+  socket.readable.pipeTo(new WritableStream({
+    write(packet) {
+      console.log(td.decode(packet));
+    }
+  }) as any);
+
+
+
   const options = new AdbScrcpyOptions2_1(
     new ScrcpyOptions3_1(opts)
   );

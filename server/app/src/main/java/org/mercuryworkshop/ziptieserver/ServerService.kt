@@ -12,7 +12,7 @@ import java.io.InputStreamReader
 
 
 class ServerService : Service() {
-    val SOCKET_NAME: String = "ziptie2"
+    val SOCKET_NAME: String = "ziptie"
     val TAG: String = "ServerService"
     private var socket: LocalServerSocket? = null
     private var running = true
