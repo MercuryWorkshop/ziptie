@@ -44,7 +44,10 @@ const App: Component<{}, {
   client: AdbScrcpyClient,
   expanded: boolean,
   shown: "scrcpy" | "terminal" | "code",
-  codeframe: HTMLIFrameElement
+  codeframe: HTMLIFrameElement,
+  disablecharge: boolean,
+  noui: boolean,
+
 }> = function() {
   this.css = `
 overflow: hidden;
@@ -73,15 +76,20 @@ overflow: hidden;
     height: 100%;
     width: 100%;
     z-index: 2;
+  button {
+    width: 100%;
+    height: 6em;
+  }
   }
   .controls {
     display: flex;
     flex-direction: column;
     gap: 1em;
-    background-color: white;
     border-radius: 1em;
+    border: 2px solid black;
     padding: 1em;
   }
+
 #sidebar {
   position: absolute;
   top: 50%;
@@ -150,6 +158,22 @@ iframe {
     terminal.$.start();
 
     this.shown = "scrcpy";
+
+    let setanims = await adb.subprocess.spawnAndWait("settings put global window_animation_scale 0 && settings put global transition_animation_scale 0 && settings put global animator_duration_scale 0");
+    if (setanims.exitCode != 0) {
+      console.error("failed to disable animations");
+    }
+    if (this.disablecharge) {
+      let setcharge = await adb.subprocess.spawnAndWait("dumpsys battery unplug");
+      if (setcharge.exitCode != 0) {
+        console.error("failed to disable charging");
+      }
+    } else {
+      let setcharge = await adb.subprocess.spawnAndWait("dumpsys battery reset");
+      if (setcharge.exitCode != 0) {
+        console.error("failed to reset charging");
+      }
+    }
   }
   const startx = async () => {
     let fs = await adb.sync();
@@ -175,6 +199,30 @@ iframe {
     prootCmd("PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
   };
 
+  // const logcat = new Logcat(adb);
+  // logcat.binary().pipeTo(new WritableStream({
+  //   write(packet: AndroidLogEntry) {
+  //     if (packet.tag.includes("ziptie") || packet.tag.includes("ServerService"))
+  //       console.log(packet.message, packet.tag);
+  //   }
+  // }) as any);
+  //
+  // console.log(await adb.subprocess.spawnAndWait("am start-service -n org.mercuryworkshop.ziptieserver/.ServerService"));
+  //
+  // await new Promise(resolve => setTimeout(resolve, 5000));
+  // let socket = await adb.createSocket("localabstract:ziptie");
+  // let writer = socket.writable.getWriter();
+  // let te = new TextEncoder();
+  // let td = new TextDecoder();
+  // writer.write(te.encode("hello\n"));
+  // socket.readable.pipeTo(new WritableStream({
+  //   write(packet) {
+  //     console.log(td.decode(packet));
+  //   }
+  // }) as any);
+  //
+
+
 
   return <div id="app">
     <div class="container">
@@ -191,17 +239,15 @@ iframe {
             this.shown = "scrcpy";
           }}>termux</button>
           <button on:click={async () => {
-            await this.client.controller!.injectKeyCode({
-              action: AndroidKeyEventAction.Down,
-              keyCode: AndroidKeyCode.AndroidHome,
-            });
-            await this.client.controller!.injectKeyCode({
-              action: AndroidKeyEventAction.Up,
-              keyCode: AndroidKeyCode.AndroidHome,
-            });
+            await adb.subprocess.spawnAndWait("am start -n com.google.android.apps.nexuslauncher/.NexusLauncherActivity --ez android.intent.extra.FULLSCREEN true");
             this.shown = "scrcpy";
             this.scrcpy.$.showx11 = false;
           }}>menu</button>
+          <button on:click={async () => {
+            await adb.subprocess.spawnAndWait("am start -n com.discord/.main.MainDefault --ez android.intent.extra.FULLSCREEN true");
+            this.shown = "scrcpy";
+            this.scrcpy.$.showx11 = false;
+          }}>discord</button>
           <button on:click={() => {
             this.shown = "terminal";
             this.scrcpy.$.showx11 = false;
@@ -230,6 +276,8 @@ iframe {
       <div class="center">
         <div class="controls">
           <button on:click={connect}>connect adb</button>
+          <label>disable charging</label>
+          <input type="checkbox" bind:checked={use(this.disablecharge)} />
         </div>
       </div>
     )}
