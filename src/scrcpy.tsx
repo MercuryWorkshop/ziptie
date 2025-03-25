@@ -177,7 +177,7 @@ position: relative;
       e.stopPropagation()
 
       if (this.showx11) {
-        writeints([2, e.deltaX, e.deltaY]);
+        writeints([2, e.deltaX, e.deltaY, 0, 0]);
       } else {
         controller.injectScroll({
           ...getPointer(video, e.clientX, e.clientY),
