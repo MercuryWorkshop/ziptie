@@ -12,6 +12,7 @@
 
 #define CMD_KEY 0
 #define CMD_MOUSE 1
+#define CMD_SCROLL 2
 
 typedef struct {
   int type;
@@ -26,6 +27,10 @@ typedef struct {
       int key;
       int state;
     } key;
+    struct {
+      int x;
+      int y;
+    } scroll;
   };
 } command_t;
 
@@ -100,6 +105,28 @@ int main() {
       XFlush(display);
     } else if (cmd.type == CMD_KEY) {
       XTestFakeKeyEvent(display, cmd.key.key, cmd.key.state, CurrentTime);
+      XFlush(display);
+    } else if (cmd.type == CMD_SCROLL) {
+      if (cmd.scroll.x == 0) {
+        if (cmd.scroll.y > 0) {
+          XTestFakeButtonEvent(display,5,1,CurrentTime);
+          XTestFakeButtonEvent(display,5,0,CurrentTime);
+        } else {
+          XTestFakeButtonEvent(display,4,1,CurrentTime);
+          XTestFakeButtonEvent(display,4,0,CurrentTime);
+        }
+      } else {
+        if (cmd.scroll.x > 0) {
+          XTestFakeButtonEvent(display,6,1,CurrentTime);
+          XTestFakeButtonEvent(display,6,0,CurrentTime);
+        } else {
+          XTestFakeButtonEvent(display,7,1,CurrentTime);
+          XTestFakeButtonEvent(display,7,0,CurrentTime);
+        }
+      }
+      
+
+
       XFlush(display);
     } else {
       printf("Unknown command type %d\n", cmd.type);

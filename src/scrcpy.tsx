@@ -172,16 +172,20 @@ position: relative;
       }
     }
 
-    function injectScroll(e: WheelEvent) {
+    const injectScroll = (e: WheelEvent) => {
       e.preventDefault()
       e.stopPropagation()
 
-      controller.injectScroll({
-        ...getPointer(video, e.clientX, e.clientY),
-        scrollX: -e.deltaX / 100,
-        scrollY: -e.deltaY / 100,
-        buttons: 0,
-      })
+      if (this.showx11) {
+        writeints([2, e.deltaX, e.deltaY]);
+      } else {
+        controller.injectScroll({
+          ...getPointer(video, e.clientX, e.clientY),
+          scrollX: -e.deltaX / 100,
+          scrollY: -e.deltaY / 100,
+          buttons: 0,
+        })
+      }
     };
     const injectTouch = async (e: PointerEvent) => {
       e.preventDefault()
