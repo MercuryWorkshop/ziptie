@@ -7,6 +7,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+/server/.kotlin
+/server/.idea
+/server/.gradle
+/server/server/build
+
 node_modules
 dist
 dist-ssr

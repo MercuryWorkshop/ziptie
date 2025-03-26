@@ -1,0 +1,55 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'org.mercuryworkshop.ziptie'
+
+    compileSdk = 33
+
+    def pkgFilePath = "$rootDir/../package.json"
+    def pkgFile = new File(pkgFilePath)
+    def pkgJson = new groovy.json.JsonSlurper().parseText(pkgFile.text)
+
+    defaultConfig {
+        minSdk 23
+        versionCode 1
+        versionName pkgJson.version
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+android.applicationVariants.all { variant ->
+    variant.outputs.all {
+        outputFileName = "ziptie-server-v${versionName}.apk"
+
+        def dexPath = rootProject.rootDir.path
+        variant.assembleProvider.get().doLast {
+            copy {
+                def file = zipTree(file(outputFile)).matching { include 'classes*.dex' }.singleFile
+
+                from file
+                into dexPath
+                rename { String fileName ->
+                    fileName.replace(file.getName(), "ziptie.dex")
+                }
+            }
+        }
+    }
+}
