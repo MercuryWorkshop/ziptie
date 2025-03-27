@@ -1,5 +1,5 @@
 import { AdbScrcpyClient } from '@yume-chan/adb-scrcpy';
-import { adb, connectAdb, displayId, logProcess, prootCmd, startScrcpy, termuxCmd, termuxShell } from './adb';
+import { adb, connectAdb, displayId, gDisplayId, logProcess, prootCmd, startScrcpy, termuxCmd, termuxShell } from './adb';
 import './style.css'
 import "dreamland";
 import { AndroidKeyCode, AndroidKeyEventAction } from '@yume-chan/scrcpy';
@@ -183,14 +183,53 @@ iframe {
       ab.set(text, 4);
       writer.write(ab);
     }
-    sendjson({ packageNames: ["com.discord"] });
-    socket.readable.pipeTo(new WritableStream({
+    console.log(sendjson);
+    sendjson({ req: "getapps" });
+    let currentPacket = new Uint8Array();
+    let currentSize = -1;
+    let ts = new TransformStream({
+      transform(chunk, controller) {
+        currentPacket = new Uint8Array([...currentPacket, ...chunk]);
+        while (true) {
+          if (currentSize === -1) {
+            if (currentPacket.length < 4) {
+              console.log("too small");
+              break;
+            }
+            let size: number;
+            try {
+              let dv = new DataView(currentPacket.buffer);
+              size = dv.getUint32(0);
+            } catch (err) {
+              break;
+            }
+            currentSize = size;
+            console.log("size", size, currentPacket);
+            currentPacket = currentPacket.slice(4);
+          }
+
+          if (currentPacket.length < currentSize) {
+            // too small, don't do anything
+            break;
+          }
+
+          const pkt = currentPacket.slice(0, currentSize);
+          controller.enqueue(pkt);
+          currentPacket = currentPacket.slice(currentSize);
+          currentSize = -1;
+        }
+      },
+    });
+    socket.readable.pipeThrough(ts as any).pipeTo(new WritableStream({
       write(packet) {
+        console.log(td.decode(packet));
         console.log(JSON.parse(td.decode(packet)));
       }
     }) as any);
 
     console.log(e);
+    console.log(gDisplayId);
+    window.x = sendjson;
 
     this.client = await startScrcpy(this.scrcpy);
 

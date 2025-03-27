@@ -26,8 +26,6 @@ class Server {
     fun start(args: Array<String>) {
         Log.i(TAG, "Start server")
 
-        Log.i(TAG, "Start server ${FakeContext.get().packageManager.getInstalledPackages(PackageManager.GET_ACTIVITIES)}");
-
         val outy = PrintStream(FileOutputStream("/proc/self/fd/1"))
         outy.println("Hello, stdout via fd!")
         outy.close()

@@ -136,6 +136,7 @@ export async function getDisplayIds(): Promise<number[]> {
   } while (match);
   return Array.from(unique);
 }
+export let gDisplayId = -1;
 
 export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> {
   console.log(VERSION); // 2.1
@@ -174,6 +175,7 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
     if (newDisplayIds.length != 1) throw new Error("something went wrong creating screens");
     let displayId = newDisplayIds[0];
     console.log("displayId", displayId);
+    gDisplayId = displayId;
 
     // after creating we can resize it and it won't change the overlay size
     await adb.subprocess.spawnAndWait(["wm", "size", `${window.innerWidth}x${window.innerHeight}`, "-d", displayId.toString()]);
