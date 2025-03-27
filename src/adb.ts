@@ -16,7 +16,7 @@ export enum VirtualDisplayMode {
   Internal,
   Shell,
 }
-export const VIRTUAL_DISPLAY_MODE: VirtualDisplayMode = VirtualDisplayMode.Shell;
+export const VIRTUAL_DISPLAY_MODE: VirtualDisplayMode = VirtualDisplayMode.Internal;
 
 
 const Manager: AdbDaemonWebUsbDeviceManager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
@@ -143,13 +143,13 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
   await AdbScrcpyClient.pushServer(adb, server.body as any);
 
 
-
   let opts: ScrcpyOptions3_1.Init = {
     stayAwake: true,
-    videoBitRate: 1,
+    videoBitRate: 10000,
     clipboardAutosync: true,
     control: true,
     audio: true,
+
     videoCodecOptions: new CodecOptions({
       level: 1,
       iFrameInterval: 10000,
@@ -168,7 +168,7 @@ export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> 
 
     // create an overlay with a very small size so that it doesn't interfere with the main display too much
     // JANK JANK JANK todo figure out what numbers it accepts
-    if ((await adb.subprocess.spawnAndWait(["settings", "put", "global", "overlay_display_devices", "800x100/600"])).exitCode != 0) throw new Error("fail");
+    if ((await adb.subprocess.spawnAndWait(["settings", "put", "global", "overlay_display_devices", "900x300/600"])).exitCode != 0) throw new Error("fail");
     let displayIds = await getDisplayIds();
     let newDisplayIds = displayIds.filter(x => !oldDisplayIds.includes(x));
     if (newDisplayIds.length != 1) throw new Error("something went wrong creating screens");
@@ -237,7 +237,7 @@ export async function termuxCmdWait(cmd: string): Promise<AdbSubprocessWaitResul
   return await adb.subprocess.spawnAndWait(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
 }
 
-function logProcess(process: AdbSubprocessProtocol) {
+export function logProcess(process: AdbSubprocessProtocol) {
   let stdout_pending_data = "";
   let stderr_pending_data = "";
   process.stdout.pipeTo(new WritableStream({
@@ -264,7 +264,7 @@ function logProcess(process: AdbSubprocessProtocol) {
 }
 
 export async function prootCmd(cmd: string): Promise<number> {
-  return await termuxCmd(`proot-distro login archlinux --shared-tmp -- ${cmd}`);
+  return await termuxCmd(`proot-distro login debian --shared-tmp -- ${cmd}`);
 }
 export async function termuxCmd(cmd: string): Promise<number> {
   let a = await adb.subprocess.spawn(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);

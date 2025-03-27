@@ -13,20 +13,27 @@ import android.util.Base64
 import android.util.DisplayMetrics
 import android.util.Log
 import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
+import java.io.PrintStream
+import java.nio.ByteBuffer
 import org.json.JSONArray
 import org.json.JSONObject
 
 fun readJsonFromInputStream(inputStream: InputStream): JSONObject? {
-    return try {
-        val jsonString = inputStream.bufferedReader().use { it.readText() }
-        JSONObject(jsonString)
-    } catch (e: Exception) {
-        // Handle exceptions like JSONException (if the input is not valid JSON)
-        // or IOException (if there's an issue reading the stream).
-        e.printStackTrace()
-        null
+    // length int, json string
+    val lengthBytes = ByteArray(4)
+    if (inputStream.read(lengthBytes) != 4) {
+        return null
     }
+
+    val length = ByteBuffer.wrap(lengthBytes).int
+    val jsonBytes = ByteArray(length)
+    if (inputStream.read(jsonBytes) != length) {
+        return null
+    }
+
+    return JSONObject(String(jsonBytes))
 }
 
 class Connection(private val client: LocalSocket) : Thread() {
@@ -47,7 +54,15 @@ class Connection(private val client: LocalSocket) : Thread() {
         while (!isInterrupted && client.isConnected) {
             try {
                 val request = readJsonFromInputStream(client.inputStream) ?: continue
+
                 Log.i(TAG, "Received request: $request")
+
+                val packageInfos = getPackageInfos()
+                val response = JSONObject()
+                response.put("version", getVersion())
+                response.put("packageInfos", packageInfos)
+                client.outputStream.write(response.toString().toByteArray())
+
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to handle request", e)
                 break
@@ -62,8 +77,16 @@ class Connection(private val client: LocalSocket) : Thread() {
         return BuildConfig.VERSION_NAME
     }
 
-    private fun getPackageInfos(params: JSONObject): JSONArray {
-        val packageNames = Util.jsonArrayToStringArray(params.getJSONArray("packageNames"))
+    private fun getPackageInfos(): JSONArray {
+
+        val packageNames = ServiceManager.packageManager.getInstalledPackages(PackageManager.GET_ACTIVITIES or PackageManager.GET_SERVICES)
+//            .filter {
+//                val launchIntent = ServiceManager.packageManager.getLaunchIntentForPackage(it.packageName)
+//                launchIntent != null
+//            }
+            .map { it.packageName }
+
+        Log.e(TAG, "Package names: $packageNames")
         val result = JSONArray()
 
         packageNames.forEach {

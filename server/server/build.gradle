@@ -53,3 +53,27 @@ android.applicationVariants.all { variant ->
         }
     }
 }
+
+android.applicationVariants.all { variant ->
+    variant.outputs.all {
+        println variant.name
+        if (variant.name.contains("release")) {
+            outputFileName = new File("../", "${variant.name}-${variant.versionName}.apk")
+            println outputFileName
+        }
+    }
+}
+
+android.applicationVariants.all { variant ->
+    if (variant.buildType.name == "release") {
+        variant.assembleProvider.get().doLast {
+            def sourceApk = variant.outputs.first().outputFile
+            def destinationDir = new File(rootProject.rootDir, "../") // Change path as needed
+
+            copy {
+                from sourceApk
+                into destinationDir
+            }
+        }
+    }
+}

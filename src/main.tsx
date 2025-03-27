@@ -1,5 +1,5 @@
 import { AdbScrcpyClient } from '@yume-chan/adb-scrcpy';
-import { adb, connectAdb, displayId, prootCmd, startScrcpy, termuxCmd, termuxShell } from './adb';
+import { adb, connectAdb, displayId, logProcess, prootCmd, startScrcpy, termuxCmd, termuxShell } from './adb';
 import './style.css'
 import "dreamland";
 import { AndroidKeyCode, AndroidKeyEventAction } from '@yume-chan/scrcpy';
@@ -8,9 +8,8 @@ import { AdbSocket } from '@yume-chan/adb';
 
 
 
-function mkstream(text: string): any {
-  let encoder = new TextEncoder();
-  let uint8array = new Uint8Array(encoder.encode(text));
+function mkstream(text: string | Uint8Array): any {
+  let uint8array = text instanceof Uint8Array ? text : new TextEncoder().encode(text);
   return new ReadableStream({
     start(controller) {
       controller.enqueue(uint8array);
@@ -21,18 +20,21 @@ function mkstream(text: string): any {
 
 // let prefix = "/data/user/0/com.termux/linuxdeploy-cli";
 // let chrootdir = prefix + "/img";
-let chrootdir = "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/archlinux";
 let tmpdir = "/data/local/tmp";
 
 import zipmouse from "../zipmouse.c?raw"
 import zipstart from "../zipstart.sh?raw"
+import server from "../release-0.0.0.apk?arraybuffer"
 import { Terminal } from './Terminal';
 import { proxyInitLibcurl, proxyLoadPage } from './proxy';
+import { Logcat } from '@yume-chan/android-bin';
+import { send } from 'vite';
 
 window.termuxshell = termuxShell;
 window.termuxcmd = termuxCmd;
 
 
+console.log(server)
 export const state = $state({
   connected: false,
 });
@@ -151,6 +153,45 @@ iframe {
     }
     // }
 
+
+    const logcat = new Logcat(adb);
+    logcat.binary().pipeTo(new WritableStream({
+      write(packet) {
+        if (packet.message.includes("Start server") || packet.tag.includes("Ziptie"))
+          console.log(packet.message, packet.tag);
+      }
+    }) as any);
+
+    let fs = await adb.sync();
+    await fs.write({
+      filename: tmpdir + "/server.apk",
+      file: mkstream(server)
+    });
+    let e = await adb.subprocess.shell(["sh", "-c", `echo "if i remove this echo it breaks" && CLASSPATH=${tmpdir}/server.apk app_process /system/bin org.mercuryworkshop.ziptie.Server`]);
+    logProcess(e);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    let socket = await adb.createSocket("localabstract:ziptie");
+    let writer = socket.writable.getWriter();
+    let te = new TextEncoder();
+    let td = new TextDecoder();
+
+    const sendjson = (json: any) => {
+      let text = te.encode(JSON.stringify(json));
+      let ab = new Uint8Array(text.length + 4);
+      let dv = new DataView(ab.buffer);
+      dv.setUint32(0, text.length);
+      ab.set(text, 4);
+      writer.write(ab);
+    }
+    sendjson({ packageNames: ["com.discord"] });
+    socket.readable.pipeTo(new WritableStream({
+      write(packet) {
+        console.log(JSON.parse(td.decode(packet)));
+      }
+    }) as any);
+
+    console.log(e);
+
     this.client = await startScrcpy(this.scrcpy);
 
     state.connected = true;
@@ -186,7 +227,6 @@ iframe {
       filename: tmpdir + "/zipstart.sh",
       file: mkstream(zipstart)
     });
-
     await termuxCmd(`rm pipe; mkfifo pipe; sleep 2`);
     termuxCmd(`bash ${tmpdir}/zipstart.sh`);
     await termuxCmd(`sleep 2; cat pipe`);
@@ -199,14 +239,7 @@ iframe {
     prootCmd("PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
   };
 
-  // const logcat = new Logcat(adb);
-  // logcat.binary().pipeTo(new WritableStream({
-  //   write(packet: AndroidLogEntry) {
-  //     if (packet.tag.includes("ziptie") || packet.tag.includes("ServerService"))
-  //       console.log(packet.message, packet.tag);
-  //   }
-  // }) as any);
-  //
+
   // console.log(await adb.subprocess.spawnAndWait("am start-service -n org.mercuryworkshop.ziptieserver/.ServerService"));
   //
   // await new Promise(resolve => setTimeout(resolve, 5000));
@@ -220,7 +253,7 @@ iframe {
   //     console.log(td.decode(packet));
   //   }
   // }) as any);
-  //
+
 
 
 

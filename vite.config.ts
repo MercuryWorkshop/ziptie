@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile"
+import fs from 'fs';
 
 export default defineConfig({
   optimizeDeps: {
@@ -7,5 +8,19 @@ export default defineConfig({
   },
   plugins: [
     viteSingleFile(),
+    {
+      name: 'vite-plugin-arraybuffer',
+      enforce: 'pre',
+
+      async load(id) {
+        if (id.match(/\?arraybuffer$/)) {
+          const filePath = id.replace(/\?arraybuffer$/, '');
+          const buffer = await fs.promises.readFile(filePath);
+          const arrayBuffer = Buffer.from(buffer).buffer;
+
+          return `export default new Uint8Array(${JSON.stringify([...new Uint8Array(arrayBuffer)])});`;
+        }
+      }
+    }
   ]
 });
