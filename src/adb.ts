@@ -10,7 +10,7 @@ import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcp
 import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
 import { pipeFrom, PushReadableStream, ReadableStream, StructDeserializeStream, WrapReadableStream, WrapWritableStream } from '@yume-chan/stream-extra';
 import { Logcat, AndroidLogEntry } from '@yume-chan/android-bin';
-import { debug } from './main';
+import { debug, state } from './main';
 
 export enum VirtualDisplayMode {
   None,
@@ -141,7 +141,7 @@ import { createFramer, mkstream } from './util';
 let tmpdir = "/data/local/tmp";
 export class AdbManager {
   socketWriter: WritableStreamDefaultWriter<MaybeConsumable<Uint8Array>> | undefined;
-  displayId: number | undefined
+  displayId: number = 0
   scrcpy: AdbScrcpyClient | undefined
 
   constructor(public adb: Adb, public fs: AdbSync) { }
@@ -204,6 +204,10 @@ export class AdbManager {
 
   }
 
+  async openApp(packageName: string) {
+    await this.sendCommand({ req: "launch", packageName, displayId: this.displayId });
+  }
+
   async sendCommand(json: any) {
     if (!this.socketWriter) throw new Error("socket not open");
     let text = new TextEncoder().encode(JSON.stringify(json));
@@ -215,6 +219,14 @@ export class AdbManager {
   }
 
   async parseResponse(json: any) {
+    switch (json.req) {
+      case "apps":
+        state.apps = json.data.packageInfos;
+        break;
+      case "openapps":
+        state.openApps = json.data;
+        break;
+    }
     console.log(json);
   }
 

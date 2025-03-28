@@ -18,11 +18,51 @@ export let adb: AdbManager;
 
 import { Terminal } from './Terminal';
 import { proxyInitLibcurl, proxyLoadPage } from './proxy';
+type NativeApp = any
 export const state = $state({
   connected: false,
+  apps: {} as Record<string, NativeApp>,
+  openApps: [] as string[],
 });
 
 
+const Launcher: Component<{
+  launch: (app: string) => void,
+}> = function() {
+  this.css = `
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10em, 1fr));
+  gap: 1em;
+  background-color: black;
+  overflow: scroll;
+  width: 100%;
+  height: 100%;
+
+  button {
+    background-color: white;
+    border: none;
+    padding: 1em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    img {
+      width: 32px;
+      height: 32px;
+    }
+  }
+  `
+
+  return <div>
+    {use(state.apps, apps => Object.values(apps).map(app =>
+      <button on:click={() => this.launch(app.packageName)}>
+        <img src={app.icon} />
+        {app.packageName}
+      </button>
+    ))}
+  </div>
+}
 
 const App: Component<{}, {
   scrcpy: ReturnType<typeof Scrcpy>,
@@ -116,6 +156,16 @@ iframe {
   height: 100%;
   border: none;
 }
+
+.launcher {
+  width: 60%;
+  height: 60%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
   `
 
   let terminal = <Terminal />;
@@ -132,6 +182,7 @@ iframe {
       return;
     }
 
+    await adb.startLogcat();
     await adb.startNative();
 
     await adb.startScrcpy();
@@ -182,24 +233,18 @@ iframe {
   };
 
 
-  // console.log(await adb.subprocess.spawnAndWait("am start-service -n org.mercuryworkshop.ziptieserver/.ServerService"));
-  //
-  // await new Promise(resolve => setTimeout(resolve, 5000));
-  // let socket = await adb.createSocket("localabstract:ziptie");
-  // let writer = socket.writable.getWriter();
-  // let te = new TextEncoder();
-  // let td = new TextDecoder();
-  // writer.write(te.encode("hello\n"));
-  // socket.readable.pipeTo(new WritableStream({
-  //   write(packet) {
-  //     console.log(td.decode(packet));
-  //   }
-  // }) as any);
-
 
 
 
   return <div id="app">
+    <div class="launcher">
+      <Launcher launch={(name: string) => {
+        this.shown = "scrcpy";
+        adb.openApp(name);
+        this.scrcpy.$.showx11 = false;
+      }} />
+    </div>
+
     <div class="container">
       <div id="sidebar" class:expanded={use(this.expanded)}>
         <div id="handle" on:click={() => {
@@ -207,22 +252,13 @@ iframe {
         }} />
 
         <div class="contents">
+
           <button on:click={startx}>startx</button>
           <button on:click={() => {
             openApp("com.termux.x11")
             this.scrcpy.$.showx11 = true;
             this.shown = "scrcpy";
           }}>termux</button>
-          <button on:click={async () => {
-            await adb.subprocess.spawnAndWait("am start -n com.google.android.apps.nexuslauncher/.NexusLauncherActivity --ez android.intent.extra.FULLSCREEN true");
-            this.shown = "scrcpy";
-            this.scrcpy.$.showx11 = false;
-          }}>menu</button>
-          <button on:click={async () => {
-            await adb.subprocess.spawnAndWait("am start -n com.discord/.main.MainDefault --ez android.intent.extra.FULLSCREEN true");
-            this.shown = "scrcpy";
-            this.scrcpy.$.showx11 = false;
-          }}>discord</button>
           <button on:click={() => {
             this.shown = "terminal";
             this.scrcpy.$.showx11 = false;

@@ -149,40 +149,40 @@ public final class ActivityManager {
             return 0;
         }
     }
-    @TargetApi(Build.VERSION_CODES.N)
-    @SuppressLint("PrivateApi")
-    public static IContentProvider getContentProviderExternalSettings(IInterface activityManager) {
-        try {
-            IBinder token = new Binder();
-            java.lang.reflect.Method method = activityManager.getClass().getMethod(
-                    "getContentProviderExternal",
-                    String.class,
-                    int.class,
-                    IBinder.class
-            );
-
-            Object provider = method.invoke(activityManager, "settings", UserHandle.getUserHandleForUid(2000), token);
-
-            // Handle the result based on Android version
-            if (provider != null) {
-                // For older versions, it might return an IContentProvider directly
-                if (provider instanceof IContentProvider) {
-                    return (IContentProvider) provider;
-                } else {
-                    // For newer versions, it might return a ContentProviderHolder
-                    java.lang.reflect.Field providerField = provider.getClass().getField("provider");
-                    return (IContentProvider) providerField.get(provider);
-                }
-            } else {
-                return null;
-            }
-        } catch (NoSuchMethodException e) {
-            Ln.d( "Error getting AAA: " + e.getMessage());
-        } catch (Exception e) {
-            Ln.d( "Error getting content provider: " + e.getMessage());
-            return null;
-        }
-    }
+//    @TargetApi(Build.VERSION_CODES.N)
+//    @SuppressLint("PrivateApi")
+//    public static IContentProvider getContentProviderExternalSettings(IInterface activityManager) {
+//        try {
+//            IBinder token = new Binder();
+//            java.lang.reflect.Method method = activityManager.getClass().getMethod(
+//                    "getContentProviderExternal",
+//                    String.class,
+//                    int.class,
+//                    IBinder.class
+//            );
+//
+//            Object provider = method.invoke(activityManager, "settings", UserHandle.getUserHandleForUid(2000), token);
+//
+//            // Handle the result based on Android version
+//            if (provider != null) {
+//                // For older versions, it might return an IContentProvider directly
+//                if (provider instanceof IContentProvider) {
+//                    return (IContentProvider) provider;
+//                } else {
+//                    // For newer versions, it might return a ContentProviderHolder
+//                    java.lang.reflect.Field providerField = provider.getClass().getField("provider");
+//                    return (IContentProvider) providerField.get(provider);
+//                }
+//            } else {
+//                return null;
+//            }
+//        } catch (NoSuchMethodException e) {
+//            Ln.d( "Error getting AAA: " + e.getMessage());
+//        } catch (Exception e) {
+//            Ln.d( "Error getting content provider: " + e.getMessage());
+//            return null;
+//        }
+//    }
     private Method getForceStopPackageMethod() throws NoSuchMethodException {
         if (forceStopPackageMethod == null) {
             forceStopPackageMethod = manager.getClass().getMethod("forceStopPackage", String.class, int.class);

@@ -85,7 +85,8 @@ class Connection(private val client: LocalSocket) : Thread() {
 
     override fun run() {
         send(JSONObject(mapOf(
-            "version" to getVersion()
+            "req" to "apps",
+            "data" to getPackageInfos()
         )))
         while (!isInterrupted && client.isConnected) {
             try {
@@ -93,9 +94,7 @@ class Connection(private val client: LocalSocket) : Thread() {
 
                 val request = readJsonFromInputStream(client.inputStream) ?: continue
 
-                FakeContext.get().startActivity()
                 send(when (request["req"]) {
-                    "getapps" -> getPackageInfos()
                     "launch" -> launchApp(request["packageName"].toString(), request["displayId"] as Int)
                     else -> {
                         throw Exception("invalid command")
