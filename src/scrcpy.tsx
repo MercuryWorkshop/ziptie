@@ -7,7 +7,6 @@ import {
   BitmapVideoFrameRenderer,
   WebCodecsVideoDecoder,
 } from "@yume-chan/scrcpy-decoder-webcodecs";
-import { adb, termuxShell, VIRTUAL_DISPLAY_MODE, VirtualDisplayMode } from "./adb";
 import { AndroidKeyCode, AndroidKeyEventAction, AndroidKeyEventMeta, AndroidMotionEventAction, AndroidMotionEventButton, ScrcpyAudioCodec, ScrcpyControlMessageSerializer, ScrcpyControlMessageWriter } from "@yume-chan/scrcpy";
 import { OpusStream } from "./audio";
 import { state } from "./main";
@@ -126,8 +125,8 @@ position: relative;
   }
 
   this.connectdaemon = async () => {
-    let socket = await adb.createSocket("tcp:12345");
-    writer = socket.writable.getWriter() as any;
+    // let socket = await adb.createSocket("tcp:12345");
+    // writer = socket.writable.getWriter() as any;
   }
 
   const startController = async (video: HTMLVideoElement, controller: ScrcpyControlMessageWriter) => {

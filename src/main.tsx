@@ -1,5 +1,5 @@
 import { AdbScrcpyClient } from '@yume-chan/adb-scrcpy';
-import { adb, connectAdb, displayId, gDisplayId, logProcess, prootCmd, startScrcpy, termuxCmd, termuxShell } from './adb';
+import { AdbManager, gDisplayId, logProcess, prootCmd, startScrcpy, termuxCmd, termuxShell } from './adb';
 import './style.css'
 import "dreamland";
 import { AndroidKeyCode, AndroidKeyEventAction } from '@yume-chan/scrcpy';
@@ -7,34 +7,17 @@ import { Scrcpy } from './scrcpy';
 import { AdbSocket } from '@yume-chan/adb';
 
 
+export const debug: any = {};
+(window as any).dbg = debug;
 
-function mkstream(text: string | Uint8Array): any {
-  let uint8array = text instanceof Uint8Array ? text : new TextEncoder().encode(text);
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(uint8array);
-      controller.close();
-    }
-  });
-}
 
-// let prefix = "/data/user/0/com.termux/linuxdeploy-cli";
-// let chrootdir = prefix + "/img";
-let tmpdir = "/data/local/tmp";
+export let adb: AdbManager;
 
-import zipmouse from "../zipmouse.c?raw"
-import zipstart from "../zipstart.sh?raw"
-import server from "../release-0.0.0.apk?arraybuffer"
+
+
+
 import { Terminal } from './Terminal';
 import { proxyInitLibcurl, proxyLoadPage } from './proxy';
-import { Logcat } from '@yume-chan/android-bin';
-import { send } from 'vite';
-
-window.termuxshell = termuxShell;
-window.termuxcmd = termuxCmd;
-
-
-console.log(server)
 export const state = $state({
   connected: false,
 });
@@ -142,118 +125,38 @@ iframe {
   }
 
   const connect = async () => {
-    // while (true) {
     try {
-      await connectAdb();
-      // break;
+      adb = await AdbManager.connect();
     } catch (error) {
       alert(error);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
       return;
     }
-    // }
 
+    await adb.startNative();
 
-    const logcat = new Logcat(adb);
-    logcat.binary().pipeTo(new WritableStream({
-      write(packet) {
-        if (packet.message.includes("Start server") || packet.tag.includes("Ziptie"))
-          console.log(packet.message, packet.tag);
-      }
-    }) as any);
-
-    let fs = await adb.sync();
-    await fs.write({
-      filename: tmpdir + "/server.apk",
-      file: mkstream(server)
-    });
-    let e = await adb.subprocess.shell(["sh", "-c", `echo "if i remove this echo it breaks" && CLASSPATH=${tmpdir}/server.apk app_process /system/bin org.mercuryworkshop.ziptie.Server`]);
-    logProcess(e);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    let socket = await adb.createSocket("localabstract:ziptie");
-    let writer = socket.writable.getWriter();
-    let te = new TextEncoder();
-    let td = new TextDecoder();
-
-    const sendjson = (json: any) => {
-      let text = te.encode(JSON.stringify(json));
-      let ab = new Uint8Array(text.length + 4);
-      let dv = new DataView(ab.buffer);
-      dv.setUint32(0, text.length);
-      ab.set(text, 4);
-      writer.write(ab);
-    }
-    console.log(sendjson);
-    sendjson({ req: "getapps" });
-    let currentPacket = new Uint8Array();
-    let currentSize = -1;
-    let ts = new TransformStream({
-      transform(chunk, controller) {
-        currentPacket = new Uint8Array([...currentPacket, ...chunk]);
-        while (true) {
-          if (currentSize === -1) {
-            if (currentPacket.length < 4) {
-              console.log("too small");
-              break;
-            }
-            let size: number;
-            try {
-              let dv = new DataView(currentPacket.buffer);
-              size = dv.getUint32(0);
-            } catch (err) {
-              break;
-            }
-            currentSize = size;
-            console.log("size", size, currentPacket);
-            currentPacket = currentPacket.slice(4);
-          }
-
-          if (currentPacket.length < currentSize) {
-            // too small, don't do anything
-            break;
-          }
-
-          const pkt = currentPacket.slice(0, currentSize);
-          controller.enqueue(pkt);
-          currentPacket = currentPacket.slice(currentSize);
-          currentSize = -1;
-        }
-      },
-    });
-    socket.readable.pipeThrough(ts as any).pipeTo(new WritableStream({
-      write(packet) {
-        console.log(td.decode(packet));
-        console.log(JSON.parse(td.decode(packet)));
-      }
-    }) as any);
-
-    console.log(e);
-    console.log(gDisplayId);
-    window.x = sendjson;
-
-    this.client = await startScrcpy(this.scrcpy);
+    await adb.startScrcpy();
 
     state.connected = true;
-    this.scrcpy = <Scrcpy client={this.client} />;
+    this.scrcpy = <Scrcpy client={adb.scrcpy!} />;
     terminal.$.start();
 
     this.shown = "scrcpy";
 
-    let setanims = await adb.subprocess.spawnAndWait("settings put global window_animation_scale 0 && settings put global transition_animation_scale 0 && settings put global animator_duration_scale 0");
-    if (setanims.exitCode != 0) {
-      console.error("failed to disable animations");
-    }
-    if (this.disablecharge) {
-      let setcharge = await adb.subprocess.spawnAndWait("dumpsys battery unplug");
-      if (setcharge.exitCode != 0) {
-        console.error("failed to disable charging");
-      }
-    } else {
-      let setcharge = await adb.subprocess.spawnAndWait("dumpsys battery reset");
-      if (setcharge.exitCode != 0) {
-        console.error("failed to reset charging");
-      }
-    }
+    // let setanims = await adb.subprocess.spawnAndWait("settings put global window_animation_scale 0 && settings put global transition_animation_scale 0 && settings put global animator_duration_scale 0");
+    // if (setanims.exitCode != 0) {
+    //   console.error("failed to disable animations");
+    // }
+    // if (this.disablecharge) {
+    //   let setcharge = await adb.subprocess.spawnAndWait("dumpsys battery unplug");
+    //   if (setcharge.exitCode != 0) {
+    //     console.error("failed to disable charging");
+    //   }
+    // } else {
+    //   let setcharge = await adb.subprocess.spawnAndWait("dumpsys battery reset");
+    //   if (setcharge.exitCode != 0) {
+    //     console.error("failed to reset charging");
+    //   }
+    // }
   }
   const startx = async () => {
     let fs = await adb.sync();

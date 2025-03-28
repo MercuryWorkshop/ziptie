@@ -1,10 +1,10 @@
 import { Terminal as XtermTerminal } from '@xterm/xterm';
-import { adb } from './adb';
 import { FitAddon } from '@xterm/addon-fit';
 import { ClipboardAddon } from '@xterm/addon-clipboard';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 
 import "@xterm/xterm/css/xterm.css";
+import { adb } from './main';
 
 export const Terminal: Component<{}, {
   term: HTMLElement,
@@ -34,7 +34,7 @@ export const Terminal: Component<{}, {
     fit.fit();
     setInterval(() => fit.fit(), 1000); //xterm sucks blah blah blah
 
-    let shell = await adb.subprocess.shell("sh");
+    let shell = await adb.adb.subprocess.shell("sh");
     shell.stdout.pipeTo(new WritableStream({
       write(chunk) {
         term.write(chunk)

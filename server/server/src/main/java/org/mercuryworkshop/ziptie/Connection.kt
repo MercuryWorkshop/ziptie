@@ -66,7 +66,7 @@ class Connection(private val client: LocalSocket) : Thread() {
         Log.i(TAG, "Sending response of len: ${resbytes.size}")
         client.outputStream.write(bb.array());
     }
- 
+
     @TargetApi(Build.VERSION_CODES.P)
     private fun launchApp(packageName: String, displayId: Int): JSONObject {
         val pm = FakeContext.get().packageManager
@@ -87,11 +87,13 @@ class Connection(private val client: LocalSocket) : Thread() {
         send(JSONObject(mapOf(
             "version" to getVersion()
         )))
-//        launchApp("com.discord")
         while (!isInterrupted && client.isConnected) {
             try {
+
+
                 val request = readJsonFromInputStream(client.inputStream) ?: continue
 
+                FakeContext.get().startActivity()
                 send(when (request["req"]) {
                     "getapps" -> getPackageInfos()
                     "launch" -> launchApp(request["packageName"].toString(), request["displayId"] as Int)

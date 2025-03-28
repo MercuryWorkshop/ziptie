@@ -1,8 +1,8 @@
 import { AdbSocket } from "@yume-chan/adb";
-import { adb } from "./adb";
 
 // @ts-expect-error libcurl has no typedefs
 import { libcurl } from "../out/libcurl_full.mjs";
+import { adb } from "./main";
 
 // libcurl supports a custom tcp transport
 // the interface just has to resemble a websocket
@@ -39,7 +39,7 @@ class AdbSocketWS extends EventTarget {
     }
 
     console.error("connecting to (tcp:" + port + ")");
-    adb.createSocket("tcp:" + port).then(socket => {
+    adb.adb.createSocket("tcp:" + port).then(socket => {
       this.socket = socket;
       this.writer = socket.writable.getWriter();
       this.socket.readable.pipeTo(new WritableStream({
