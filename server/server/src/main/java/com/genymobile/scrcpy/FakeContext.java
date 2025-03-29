@@ -22,7 +22,7 @@ public final class FakeContext extends ContextWrapper {
         return INSTANCE;
     }
 
-    private final ContentResolver contentResolver = new ContentResolver(this) {
+    public final ContentResolver contentResolver = new ContentResolver(this) {
         @SuppressWarnings({"unused", "ProtectedMemberInFinalClass"})
         // @Override (but super-class method not visible)
         protected IContentProvider acquireProvider(Context c, String name) {

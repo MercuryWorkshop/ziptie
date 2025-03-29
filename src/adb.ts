@@ -197,13 +197,29 @@ export class AdbManager {
     let oldClipboard = "";
     setInterval(async () => {
       try {
-        let clipboard = await navigator.clipboard.readText();
+        let items = await navigator.clipboard.read();
+        if (items.length == 0) return;
+        let item = items[0];
+        let clipboard;
+        if (item.types.includes("text/plain")) {
+          let blob = await item.getType("text/plain");
+          clipboard = await blob.text();
+        } else if (item.types.includes("image/png")) {
+          let blob = await item.getType("image/png");
+          let ab = await blob.arrayBuffer();
+          let base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(ab) as unknown as number[]));
+          clipboard = `data:image/png;base64,${base64}`;
+        } else {
+          console.log("unsupported clipboard type", item.types);
+          return;
+        }
         if (clipboard == oldClipboard) return;
-        this.scrcpy!.controller!.setClipboard({
-          sequence: 0n,
-          paste: false,
-          content: clipboard,
-        });
+        if (clipboard.startsWith("data:")) {
+          console.log("setting clipboard image", clipboard);
+          this.sendCommand({ req: "setClipboardImage", uri: clipboard });
+        } else {
+          this.sendCommand({ req: "setClipboardText", text: clipboard });
+        }
         oldClipboard = clipboard;
       } catch { }
     }, 500);
@@ -282,7 +298,7 @@ export class AdbManager {
     const logcat = new Logcat(this.adb);
     logcat.binary().pipeTo(new WritableStream({
       write(packet) {
-        if (packet.message.includes("Start server") || packet.tag.includes("Ziptie"))
+        if (packet.message.includes("Start server") || packet.tag.includes("Ziptie") || packet.tag.includes("scrcpy"))
           console.log(packet.message);
       }
     }) as any);

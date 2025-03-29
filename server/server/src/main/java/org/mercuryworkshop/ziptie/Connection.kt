@@ -121,6 +121,18 @@ class Connection(private val client: LocalSocket) : Thread() {
             "displayId" to displayId
         ))
     }
+    private fun setClipboardImage(uri: String): JSONObject {
+        if (!ServiceManager.getClipboardManager().setImage(uri)) {
+            throw Exception("Failed to set clipboard image")
+        }
+        return JSONObject()
+    }
+    private fun setClipboardText(text: String): JSONObject {
+        if (!ServiceManager.getClipboardManager().setText(text)) {
+            throw Exception("Failed to set clipboard text")
+        }
+        return JSONObject()
+    }
 
     override fun run() {
         send(JSONObject(mapOf(
@@ -132,9 +144,12 @@ class Connection(private val client: LocalSocket) : Thread() {
 
 
                 val request = readJsonFromInputStream(client.inputStream) ?: continue
+                Log.i(TAG, "Received reque>st: $request")
 
                 send(when (request["req"]) {
                     "launch" -> launchApp(request["packageName"].toString(), request["displayId"] as Int)
+                    "setClipboardImage" -> setClipboardImage(request["uri"].toString())
+                    "setClipboardText" -> setClipboardText(request["text"].toString())
                     "setSetting" -> setSetting(request["namespace"].toString(), request["key"].toString(), request["value"].toString())
                     "createDisplay" -> createDisplay(request["width"] as Int, request["height"] as Int, request["density"] as Int)
                     "resizeDisplay" -> resizeDisplay(request["displayId"] as Int, request["width"] as Int, request["height"] as Int, request["density"] as Int)
@@ -143,7 +158,6 @@ class Connection(private val client: LocalSocket) : Thread() {
                     }
                 })
 
-                Log.i(TAG, "Received reque>st: $request")
 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to handle request", e)

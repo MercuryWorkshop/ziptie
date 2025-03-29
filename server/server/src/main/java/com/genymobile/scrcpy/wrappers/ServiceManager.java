@@ -31,6 +31,7 @@ public final class ServiceManager {
     private static CameraManager cameraManager;
     private static DisplayManager displayManager;
     private static WindowManager windowManager;
+    private static ClipboardManager clipboardManager;
 
     private ServiceManager() {
         /* not instantiable */
@@ -98,5 +99,12 @@ public final class ServiceManager {
             }
         }
         return cameraManager;
+    }
+
+    public static ClipboardManager getClipboardManager() {
+        if (clipboardManager == null) {
+            clipboardManager = ClipboardManager.create();
+        }
+        return clipboardManager;
     }
 }
