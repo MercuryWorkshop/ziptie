@@ -57,7 +57,7 @@ class Connection(private val client: LocalSocket) : Thread() {
 
                 Log.i(TAG, "Received request: $request")
 
-                val packageInfos = getPackageInfos()
+                val packageInfos = getPackageInfos(request)
                 val response = JSONObject()
                 response.put("version", getVersion())
                 response.put("packageInfos", packageInfos)
@@ -77,16 +77,8 @@ class Connection(private val client: LocalSocket) : Thread() {
         return BuildConfig.VERSION_NAME
     }
 
-    private fun getPackageInfos(): JSONArray {
-
-        val packageNames = ServiceManager.packageManager.getInstalledPackages(PackageManager.GET_ACTIVITIES or PackageManager.GET_SERVICES)
-//            .filter {
-//                val launchIntent = ServiceManager.packageManager.getLaunchIntentForPackage(it.packageName)
-//                launchIntent != null
-//            }
-            .map { it.packageName }
-
-        Log.e(TAG, "Package names: $packageNames")
+    private fun getPackageInfos(params: JSONObject): JSONArray {
+        val packageNames = Util.jsonArrayToStringArray(params.getJSONArray("packageNames"))
         val result = JSONArray()
 
         packageNames.forEach {
