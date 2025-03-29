@@ -147,7 +147,7 @@ const App: Component<{}, {
   scrcpy: ReturnType<typeof Scrcpy>,
   client: AdbScrcpyClient,
   expanded: boolean,
-  shown: "scrcpy" | "terminal" | "code",
+  shown: "scrcpy" | "terminal" | "code" | "none",
   codeframe: HTMLIFrameElement,
   disablecharge: boolean,
   noui: boolean,
@@ -310,7 +310,9 @@ overflow: hidden;
     this.scrcpy = <Scrcpy client={mgr.scrcpy!} />;
     terminal.$.start();
 
-    this.shown = "scrcpy";
+    this.shown = "none";
+    this.scrcpy.$.showx11 = false;
+    launcher.$.show();
 
     if (this.disablecharge) {
       let setcharge = await mgr.adb.subprocess.spawnAndWait("dumpsys battery unplug");
@@ -330,6 +332,9 @@ overflow: hidden;
   }
 
   document.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (this.scrcpy.$.showx11) {
+      return;
+    }
     if (e.key === 'Meta') {
       launcher.$.show();
       e.preventDefault();
@@ -352,6 +357,13 @@ overflow: hidden;
             launcher.$.show();
           }}>launcher</button>
           <button on:click={()=>mgr.startX11()}>startx</button>
+          <button on:click={()=>{
+            if (document.fullscreenElement) {
+              document.exitFullscreen();
+            } else {
+              this.root.requestFullscreen();
+            }
+          }}>fullscreen</button>
           <button on:click={()=>{
             mgr.openApp("com.termux.x11");
             this.shown = "scrcpy";
