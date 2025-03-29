@@ -8,7 +8,7 @@ import { BIN, VERSION } from "@yume-chan/fetch-scrcpy-server";
 import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcpy";
 
 import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
-import { pipeFrom, PushReadableStream, ReadableStream, StructDeserializeStream, WrapReadableStream, WrapWritableStream } from '@yume-chan/stream-extra';
+import { MaybeConsumable, pipeFrom, PushReadableStream, ReadableStream, StructDeserializeStream, WrapReadableStream, WrapWritableStream } from '@yume-chan/stream-extra';
 import { Logcat, AndroidLogEntry } from '@yume-chan/android-bin';
 import { debug, state } from './main';
 
@@ -143,10 +143,14 @@ export class AdbManager {
   socketWriter: WritableStreamDefaultWriter<MaybeConsumable<Uint8Array>> | undefined;
   displayId: number = 0
   scrcpy: AdbScrcpyClient | undefined
+  resolveCreateDisplay: ((value: unknown) => void) | undefined
 
   constructor(public adb: Adb, public fs: AdbSync) { }
 
   async startScrcpy() {
+    this.sendCommand({ req: "createDisplay", width: window.innerWidth, height: window.innerHeight, density: 150 });
+    await new Promise(resolve => this.resolveCreateDisplay = resolve);
+
     const server = await fetch(BIN);
     await AdbScrcpyClient.pushServer(this.adb, server.body as any);
 
@@ -157,7 +161,7 @@ export class AdbManager {
       clipboardAutosync: true,
       control: true,
       audio: true,
-
+      displayId: this.displayId,
       videoCodecOptions: new CodecOptions({
         level: 1,
         iFrameInterval: 10000,
@@ -208,6 +212,10 @@ export class AdbManager {
     await this.sendCommand({ req: "launch", packageName, displayId: this.displayId });
   }
 
+  async setSetting(namespace: string, key: string, value: string) {
+    await this.sendCommand({ req: "setSetting", namespace, key, value });
+  }
+
   async sendCommand(json: any) {
     if (!this.socketWriter) throw new Error("socket not open");
     let text = new TextEncoder().encode(JSON.stringify(json));
@@ -219,12 +227,18 @@ export class AdbManager {
   }
 
   async parseResponse(json: any) {
+    console.log(json);
     switch (json.req) {
       case "apps":
         state.apps = json.data.packageInfos;
         break;
       case "openapps":
         state.openApps = json.data;
+        break;
+      case "createDisplay":
+        console.log("createDisplay", json.displayId);
+        this.displayId = json.displayId;
+        this.resolveCreateDisplay!(json);
         break;
     }
     console.log(json);
@@ -235,7 +249,7 @@ export class AdbManager {
     logcat.binary().pipeTo(new WritableStream({
       write(packet) {
         if (packet.message.includes("Start server") || packet.tag.includes("Ziptie"))
-          console.log(packet.message, packet.tag);
+          console.log(packet.message);
       }
     }) as any);
   }

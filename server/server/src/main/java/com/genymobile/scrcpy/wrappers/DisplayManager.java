@@ -48,6 +48,10 @@ public final class DisplayManager {
     private final Object manager; // instance of hidden class android.hardware.display.DisplayManagerGlobal
     private Method createVirtualDisplayMethod;
     private Method requestDisplayPowerMethod;
+    private static Method getDisplayInfoMethod;
+    private static Method getDisplayIdsMethod;
+    private static Method setForcedDisplaySizeMethod;
+    private static Method setForcedDisplayDensityMethod;
 
     static DisplayManager create() {
         try {
@@ -137,9 +141,13 @@ public final class DisplayManager {
 
     public int[] getDisplayIds() {
         try {
-            return (int[]) manager.getClass().getMethod("getDisplayIds").invoke(manager);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError(e);
+            if (getDisplayIdsMethod == null) {
+                getDisplayIdsMethod = manager.getClass().getMethod("getDisplayIds");
+            }
+            return (int[]) getDisplayIdsMethod.invoke(manager);
+        } catch (Exception e) {
+            Ln.e("Could not get display ids", e);
+            return new int[0];
         }
     }
 
@@ -228,6 +236,24 @@ public final class DisplayManager {
             manager.getClass().getMethod("unregisterDisplayListener", displayListenerClass).invoke(manager, listener.displayListenerProxy);
         } catch (Exception e) {
             Ln.e("Could not unregister display listener", e);
+        }
+    }
+
+    public boolean resizeDisplay(int displayId, int width, int height, int density) {
+        try {
+            if (setForcedDisplaySizeMethod == null) {
+                setForcedDisplaySizeMethod = manager.getClass().getMethod("setForcedDisplaySize", int.class, int.class, int.class);
+            }
+            if (setForcedDisplayDensityMethod == null) {
+                setForcedDisplayDensityMethod = manager.getClass().getMethod("setForcedDisplayDensity", int.class, int.class);
+            }
+            
+            setForcedDisplaySizeMethod.invoke(manager, displayId, width, height);
+            setForcedDisplayDensityMethod.invoke(manager, displayId, density);
+            return true;
+        } catch (Exception e) {
+            Ln.e("Could not resize display", e);
+            return false;
         }
     }
 }

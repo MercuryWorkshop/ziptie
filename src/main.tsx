@@ -11,7 +11,7 @@ export const debug: any = {};
 (window as any).dbg = debug;
 
 
-export let adb: AdbManager;
+export let mgr: AdbManager;
 
 
 
@@ -278,41 +278,41 @@ overflow: hidden;
 
   const connect = async () => {
     try {
-      adb = await AdbManager.connect();
+      mgr = await AdbManager.connect();
     } catch (error) {
       alert(error);
       return;
     }
 
-    await adb.startLogcat();
-    await adb.startNative();
+    await mgr.startLogcat();
+    await mgr.startNative();
 
-    await adb.startScrcpy();
+    await mgr.startScrcpy();
 
     state.connected = true;
-    this.scrcpy = <Scrcpy client={adb.scrcpy!} />;
+    this.scrcpy = <Scrcpy client={mgr.scrcpy!} />;
     terminal.$.start();
 
     this.shown = "scrcpy";
 
-    // let setanims = await adb.subprocess.spawnAndWait("settings put global window_animation_scale 0 && settings put global transition_animation_scale 0 && settings put global animator_duration_scale 0");
-    // if (setanims.exitCode != 0) {
-    //   console.error("failed to disable animations");
-    // }
-    // if (this.disablecharge) {
-    //   let setcharge = await adb.subprocess.spawnAndWait("dumpsys battery unplug");
-    //   if (setcharge.exitCode != 0) {
-    //     console.error("failed to disable charging");
-    //   }
-    // } else {
-    //   let setcharge = await adb.subprocess.spawnAndWait("dumpsys battery reset");
-    //   if (setcharge.exitCode != 0) {
-    //     console.error("failed to reset charging");
-    //   }
-    // }
+    if (this.disablecharge) {
+      let setcharge = await mgr.adb.subprocess.spawnAndWait("dumpsys battery unplug");
+      if (setcharge.exitCode != 0) {
+        console.error("failed to disable charging");
+      }
+    } else {
+      let setcharge = await mgr.adb.subprocess.spawnAndWait("dumpsys battery reset");
+      if (setcharge.exitCode != 0) {
+        console.error("failed to reset charging");
+      }
+    }
+    await mgr.setSetting("global", "window_animation_scale", "0");
+    await mgr.setSetting("global", "transition_animation_scale", "0");
+    await mgr.setSetting("global", "animator_duration_scale", "0");
+      
   }
   const startx = async () => {
-    let fs = await adb.sync();
+    let fs = await mgr.sync();
 
     await fs.write({
       filename: tmpdir + "/zipmouse.c",
@@ -374,7 +374,7 @@ overflow: hidden;
       <div class="launcher" class:visible={use(state.showLauncher)}>
         <Launcher launch={(name: string) => {
           this.shown = "scrcpy";
-          adb.openApp(name);
+          mgr.openApp(name);
           this.scrcpy.$.showx11 = false;
           state.showLauncher = false;
         }} />

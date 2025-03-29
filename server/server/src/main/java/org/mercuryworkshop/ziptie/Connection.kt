@@ -19,6 +19,7 @@ import android.util.Log
 import com.genymobile.scrcpy.FakeContext
 import com.genymobile.scrcpy.wrappers.ActivityManager
 import com.genymobile.scrcpy.wrappers.ServiceManager
+import com.genymobile.scrcpy.wrappers.DisplayManager
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -83,6 +84,44 @@ class Connection(private val client: LocalSocket) : Thread() {
         return JSONObject()
     }
 
+    private fun setSetting(namespace: String, key: String, value: String): JSONObject {
+        val process = Runtime.getRuntime().exec(arrayOf("settings", "put", namespace, key, value))
+        val exitCode = process.waitFor()
+        
+        if (exitCode != 0) {
+            throw Exception("Failed to set setting $namespace.$key to $value (exit code $exitCode)")
+        }
+        
+        return JSONObject()
+    }
+
+    private fun createDisplay(width: Int, height: Int, density: Int): JSONObject {
+        setSetting("global", "overlay_display_devices", "null")
+        Thread.sleep(1000)
+        val initialIds = ServiceManager.getDisplayManager().displayIds
+        setSetting("global", "overlay_display_devices", "1000x100/600")
+        Thread.sleep(1000)
+        val nowIds = ServiceManager.getDisplayManager().displayIds
+        val newIds = nowIds.filter { !initialIds.contains(it) }
+        if (newIds.size != 1) {
+            throw Exception("Expected 1 new display, got ${newIds.size}")
+        }
+        val displayId = newIds[0]
+        ServiceManager.getWindowManager().setForcedDisplaySize(displayId, width, height)
+        ServiceManager.getWindowManager().setForcedDisplayDensity(displayId, density)
+        return JSONObject(mapOf(
+            "req" to "createDisplay",
+            "displayId" to displayId
+        ))
+    }
+    private fun resizeDisplay(displayId: Int, width: Int, height: Int, density: Int): JSONObject {
+        ServiceManager.getDisplayManager().resizeDisplay(displayId, width, height, density)
+        return JSONObject(mapOf(
+            "req" to "resizeDisplay",
+            "displayId" to displayId
+        ))
+    }
+
     override fun run() {
         send(JSONObject(mapOf(
             "req" to "apps",
@@ -96,6 +135,9 @@ class Connection(private val client: LocalSocket) : Thread() {
 
                 send(when (request["req"]) {
                     "launch" -> launchApp(request["packageName"].toString(), request["displayId"] as Int)
+                    "setSetting" -> setSetting(request["namespace"].toString(), request["key"].toString(), request["value"].toString())
+                    "createDisplay" -> createDisplay(request["width"] as Int, request["height"] as Int, request["density"] as Int)
+                    "resizeDisplay" -> resizeDisplay(request["displayId"] as Int, request["width"] as Int, request["height"] as Int, request["density"] as Int)
                     else -> {
                         throw Exception("invalid command")
                     }

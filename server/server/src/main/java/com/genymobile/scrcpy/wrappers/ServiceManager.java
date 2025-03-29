@@ -29,6 +29,8 @@ public final class ServiceManager {
     private static StatusBarManager statusBarManager;
     private static ActivityManager activityManager;
     private static CameraManager cameraManager;
+    private static DisplayManager displayManager;
+    private static WindowManager windowManager;
 
     private ServiceManager() {
         /* not instantiable */
@@ -44,8 +46,19 @@ public final class ServiceManager {
         }
     }
 
+    public static WindowManager getWindowManager() {
+        if (windowManager == null) {
+            windowManager = WindowManager.create();
+        }
+        return windowManager;
+    }
 
-
+    public static DisplayManager getDisplayManager() {
+        if (displayManager == null) {
+            displayManager = DisplayManager.create();
+        }
+        return displayManager;
+    }
 
     public static InputManager getInputManager() {
         if (inputManager == null) {
@@ -67,7 +80,6 @@ public final class ServiceManager {
         }
         return statusBarManager;
     }
-
 
     public static ActivityManager getActivityManager() {
         if (activityManager == null) {
