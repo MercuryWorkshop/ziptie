@@ -32,8 +32,16 @@ const Launcher: Component<{
 }, {
   searchText: string,
   filteredApps: NativeApp[],
+},{
+  show: () => void,
 }> = function() {
   this.searchText = "";
+  
+  this.show = () => {
+    state.showLauncher = true;
+    const searchInput = document.querySelector('.search') as HTMLInputElement;
+    if (searchInput) searchInput.focus();
+  };
   
   this.css = `
   display: flex;
@@ -115,6 +123,7 @@ const Launcher: Component<{
         if (e.key == "Enter" && this.filteredApps.length > 0) {
           this.launch(this.filteredApps[0].packageName);
           e.preventDefault();
+          this.searchText = "";
         }
         e.stopPropagation();
       }}
@@ -122,7 +131,10 @@ const Launcher: Component<{
     <div class="grid">
       {use(this.filteredApps, apps =>
         apps.map(app =>
-          <button on:click={() => this.launch(app.packageName)}>
+          <button on:click={() => {
+            this.launch(app.packageName)
+            this.searchText = ""
+          }}>
             <img src={app.icon} />
             <span>{app.packageName}</span>
           </button>
@@ -139,7 +151,6 @@ const App: Component<{}, {
   codeframe: HTMLIFrameElement,
   disablecharge: boolean,
   noui: boolean,
-
 }> = function() {
   this.css = `
 overflow: hidden;
@@ -275,6 +286,12 @@ overflow: hidden;
   `
 
   let terminal = <Terminal />;
+  let launcher = <Launcher launch={(name: string) => {
+    this.shown = "scrcpy";
+    mgr.openApp(name);
+    this.scrcpy.$.showx11 = false;
+    state.showLauncher = false;
+  }} />
 
   const connect = async () => {
     try {
@@ -334,9 +351,15 @@ overflow: hidden;
     prootCmd("PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
   };
 
-
-
-
+  document.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Meta') {
+      launcher.$.show();
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, {
+    capture: true,
+  });
 
   return <div id="app">
     <div class="container">
@@ -348,7 +371,7 @@ overflow: hidden;
         <div class="contents">
           <button on:click={(e: MouseEvent) => {
             e.stopPropagation();
-            state.showLauncher = true;
+            launcher.$.show();
           }}>launcher</button>
           <button on:click={startx}>startx</button>
           <button on:click={() => {
@@ -372,12 +395,7 @@ overflow: hidden;
       </div>
       <div class="launcher-backdrop" class:visible={use(state.showLauncher)} on:click={() => state.showLauncher = false} />
       <div class="launcher" class:visible={use(state.showLauncher)}>
-        <Launcher launch={(name: string) => {
-          this.shown = "scrcpy";
-          mgr.openApp(name);
-          this.scrcpy.$.showx11 = false;
-          state.showLauncher = false;
-        }} />
+        {launcher}
       </div>
       {$if(use(this.shown, s => s == "terminal"),
         terminal

@@ -52,11 +52,6 @@ position: relative;
 
   let screenWidth = 0;
   let screenHeight = 0;
-  const fixDisplay = async (displayId: string) => {
-    console.log('displayId', displayId);
-    let result = await adb.subprocess.spawnAndWait(["wm", "density", "150", "-d", displayId.toString()]);
-    console.log(result);
-  }
 
   const startAudio = async () => {
     let metadata = await this.client.audioStream!;
@@ -108,11 +103,6 @@ position: relative;
     this.client.stdout.pipeTo(new WritableStream({
       write(packet: string) {
         console.log(packet);
-        const match = packet.match(/\(id=(\d+)\)/);
-        if (match && match.length > 1) {
-          let displayId = match[1];
-          fixDisplay(displayId);
-        }
       }
     }) as any);
     return renderer;
