@@ -23,6 +23,7 @@ export const state = $state({
   connected: false,
   apps: {} as Record<string, NativeApp>,
   openApps: [] as string[],
+  showLauncher: false,
 });
 
 
@@ -31,25 +32,46 @@ const Launcher: Component<{
 }> = function() {
   this.css = `
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10em, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   gap: 1em;
   background-color: black;
-  overflow: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
   width: 100%;
   height: 100%;
+  padding: 1em;
 
   button {
+    aspect-ratio: 1;
     background-color: white;
     border: none;
-    padding: 1em;
+    padding: 0.5em;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    border-radius: 0.5em;
+    transition: transform 0.2s ease;
+
+    &:hover {
+      transform: scale(1.05);
+    }
 
     img {
-      width: 32px;
-      height: 32px;
+      width: 48px;
+      height: 48px;
+      margin-bottom: 0.5em;
+    }
+
+    span {
+      font-size: 0.8em;
+      text-align: center;
+      word-break: break-word;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.2;
+      max-height: 2.4em;
     }
   }
   `
@@ -58,7 +80,7 @@ const Launcher: Component<{
     {use(state.apps, apps => Object.values(apps).map(app =>
       <button on:click={() => this.launch(app.packageName)}>
         <img src={app.icon} />
-        {app.packageName}
+        <span>{app.packageName}</span>
       </button>
     ))}
   </div>
@@ -104,6 +126,7 @@ overflow: hidden;
   button {
     width: 100%;
     height: 6em;
+    border-radius: 0.5em;
   }
   }
   .controls {
@@ -115,57 +138,95 @@ overflow: hidden;
     padding: 1em;
   }
 
-#sidebar {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  left: 0;
-  z-index: 2;
-  width: 0em;
-  height: 80%;
-  border-top-right-radius: 1em;
-  border-bottom-right-radius: 1em;
-  background-color: white;
-}
-#sidebar .contents {
-  display: flex;
-  flex-direction: column;
-  gap: 1em;
-  overflow: hidden;
-}
-#sidebar.expanded {
-  width: 5em;
-  display: flex;
-  border: 2px solid black;
-}
-#handle {
-  position: absolute;
-  top: 50%;
-  transform: translate(100%, -50%);
-  right: 0;
-  height: 6em;
-  width: 1em;
-  background-color: white;
-  border: 2px solid black;
+  .launcher {
+    width: 60%;
+    height: 60%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
 
-  border-top-right-radius: 1em;
-  border-bottom-right-radius: 1em;
-}
-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
+  .launcher.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
 
-.launcher {
-  width: 60%;
-  height: 60%;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-}
+  .launcher-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 0;
+  }
+
+  .launcher-backdrop.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #sidebar {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 0;
+    z-index: 2;
+    width: 0em;
+    height: 80%;
+    border-top-right-radius: 1em;
+    border-bottom-right-radius: 1em;
+    background-color: white;
+  }
+  #sidebar .contents {
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+    overflow: hidden;
+    padding: 1em;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  #sidebar.expanded .contents {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #sidebar.expanded {
+    width: 5em;
+    display: flex;
+    border: 2px solid black;
+  }
+  #sidebar .contents button {
+    aspect-ratio: 1;
+    height: auto;
+    padding: 0.5em;
+  }
+  #handle {
+    position: absolute;
+    top: 50%;
+    transform: translate(100%, -50%);
+    right: 0;
+    height: 6em;
+    width: 1em;
+    background-color: white;
+    border: 2px solid black;
+    border-top-right-radius: 1em;
+    border-bottom-right-radius: 1em;
+  }
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
   `
 
   let terminal = <Terminal />;
@@ -237,22 +298,17 @@ iframe {
 
 
   return <div id="app">
-    <div class="launcher">
-      <Launcher launch={(name: string) => {
-        this.shown = "scrcpy";
-        adb.openApp(name);
-        this.scrcpy.$.showx11 = false;
-      }} />
-    </div>
-
     <div class="container">
-      <div id="sidebar" class:expanded={use(this.expanded)}>
+      <div id="sidebar" class:expanded={use(this.expanded)} on:click={() => state.showLauncher = false}>
         <div id="handle" on:click={() => {
           this.expanded = !this.expanded;
         }} />
 
         <div class="contents">
-
+          <button on:click={(e: MouseEvent) => {
+            e.stopPropagation();
+            state.showLauncher = true;
+          }}>launcher</button>
           <button on:click={startx}>startx</button>
           <button on:click={() => {
             openApp("com.termux.x11")
@@ -277,6 +333,15 @@ iframe {
       </div>
       <div id="scrcpycontainer" class:visible={use(this.shown, s => s == "scrcpy")}>
         {use(this.scrcpy)}
+      </div>
+      <div class="launcher-backdrop" class:visible={use(state.showLauncher)} on:click={() => state.showLauncher = false} />
+      <div class="launcher" class:visible={use(state.showLauncher)}>
+        <Launcher launch={(name: string) => {
+          this.shown = "scrcpy";
+          adb.openApp(name);
+          this.scrcpy.$.showx11 = false;
+          state.showLauncher = false;
+        }} />
       </div>
       {$if(use(this.shown, s => s == "terminal"),
         terminal
