@@ -115,7 +115,8 @@ class Connection(private val client: LocalSocket) : Thread() {
         ))
     }
     private fun resizeDisplay(displayId: Int, width: Int, height: Int, density: Int): JSONObject {
-        ServiceManager.getDisplayManager().resizeDisplay(displayId, width, height, density)
+        ServiceManager.getWindowManager().setForcedDisplaySize(displayId, width, height)
+        ServiceManager.getWindowManager().setForcedDisplayDensity(displayId, density)
         return JSONObject(mapOf(
             "req" to "resizeDisplay",
             "displayId" to displayId

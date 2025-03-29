@@ -38,45 +38,6 @@ export async function connect(device: AdbDaemonWebUsbDevice) {
 
 export let gDisplayId = -1;
 
-// export async function startScrcpy(mount: HTMLElement): Promise<AdbScrcpyClient> {
-//
-//
-//   if (VIRTUAL_DISPLAY_MODE == VirtualDisplayMode.Shell) {
-//     // create virtual displays the official way
-//     opts.newDisplay = `${window.innerWidth}x${window.innerHeight}`;
-//   } else if (VIRTUAL_DISPLAY_MODE == VirtualDisplayMode.Internal) {
-//     // VIRTUAL_DISPLAY_FLAG_TRUSTED was revoked from adb shell in android 15
-//     // create virtual displays by abusing overlay_display_devices
-//
-//     if ((await adb.subprocess.spawnAndWait(["settings", "put", "global", "overlay_display_devices", "null"])).exitCode != 0) throw new Error("fail");
-//     let oldDisplayIds = await getDisplayIds();
-//
-//     // create an overlay with a very small size so that it doesn't interfere with the main display too much
-//     // JANK JANK JANK todo figure out what numbers it accepts
-//     if ((await adb.subprocess.spawnAndWait(["settings", "put", "global", "overlay_display_devices", "900x300/600"])).exitCode != 0) throw new Error("fail");
-//     let displayIds = await getDisplayIds();
-//     let newDisplayIds = displayIds.filter(x => !oldDisplayIds.includes(x));
-//     if (newDisplayIds.length != 1) throw new Error("something went wrong creating screens");
-//     let displayId = newDisplayIds[0];
-//     console.log("displayId", displayId);
-//     gDisplayId = displayId;
-//
-//     // after creating we can resize it and it won't change the overlay size
-//     await adb.subprocess.spawnAndWait(["wm", "size", `${window.innerWidth}x${window.innerHeight}`, "-d", displayId.toString()]);
-//     await adb.subprocess.spawnAndWait(["wm", "density", "150", "-d", displayId.toString()]);
-//
-//     // systemui doesn't run on these displays for some reason
-//     await adb.subprocess.spawnAndWait(["am", "start", "-n", "com.google.android.apps.nexuslauncher/.NexusLauncherActivity", "--display", displayId.toString()]);
-//
-//     opts.displayId = displayId;
-//   } else if (VIRTUAL_DISPLAY_MODE == VirtualDisplayMode.None) {
-//     // use the main display
-//     await adb.subprocess.spawnAndWait(["wm", "reset"]);
-//     await adb.subprocess.spawnAndWait(["wm", "size", `${window.innerWidth}x${window.innerHeight}`]);
-//     await adb.subprocess.spawnAndWait(["wm", "density", "150"]);
-//   }
-//   return client;
-// }
 
 
 export function logProcess(process: AdbSubprocessProtocol) {
@@ -105,35 +66,6 @@ export function logProcess(process: AdbSubprocessProtocol) {
   }) as any);
 }
 
-export async function prootCmd(cmd: string): Promise<number> {
-  return await termuxCmd(`proot-distro login debian --shared-tmp -- ${cmd}`);
-}
-export async function termuxCmd(cmd: string): Promise<number> {
-  // let a = await adb.subprocess.spawn(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
-  // logProcess(a);
-  // return await a.exit;
-}
-
-export async function termuxShell(cmd: string = "run-as com.termux files/usr/bin/bash -lic 'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; bash -i'"): Promise<(cmd: string) => Promise<void>> {
-  // let shell = await adb.subprocess.shell(cmd);
-  // let writer = shell.stdin.getWriter();
-  // shell.stdout.pipeTo(new WritableStream({
-  //   write(packet) {
-  //     console.log(new TextDecoder().decode(packet));
-  //   }
-  // }) as any);
-  // shell.stderr.pipeTo(new WritableStream({
-  //   write(packet) {
-  //     console.error(new TextDecoder().decode(packet));
-  //   }
-  // }) as any);
-  // let te = new TextEncoder();
-  //
-  // return async (cmd: string) => {
-  //   writer.write(te.encode(cmd));
-  // }
-}
-
 import zipmouse from "../zipmouse.c?raw"
 import zipstart from "../zipstart.sh?raw"
 import server from "../release-0.0.0.apk?arraybuffer"
@@ -144,13 +76,14 @@ export class AdbManager {
   mouseWriter: WritableStreamDefaultWriter<Uint8Array> | undefined;
   
   displayId: number = 0
+  density: number = 150
   scrcpy: AdbScrcpyClient | undefined
   resolveCreateDisplay: ((value: unknown) => void) | undefined
 
   constructor(public adb: Adb, public fs: AdbSync) { }
 
   async startScrcpy() {
-    this.sendCommand({ req: "createDisplay", width: window.innerWidth, height: window.innerHeight, density: 150 });
+    this.sendCommand({ req: "createDisplay", width: window.innerWidth, height: window.innerHeight, density: this.density });
     await new Promise(resolve => this.resolveCreateDisplay = resolve);
 
     const server = await fetch(BIN);
@@ -224,6 +157,16 @@ export class AdbManager {
       } catch { }
     }, 500);
 
+    let oldInnerWidth = window.innerWidth;
+    let oldInnerHeight = window.innerHeight;
+    setInterval(() => {
+      if (window.innerWidth != oldInnerWidth || window.innerHeight != oldInnerHeight) {
+        this.sendCommand({ req: "resizeDisplay", displayId: this.displayId, width: window.innerWidth, height: window.innerHeight, density: this.density });
+        oldInnerHeight = window.innerHeight;
+        oldInnerWidth = window.innerWidth;
+      }
+    }, 100);
+
   }
 
   async startX11() {
@@ -237,14 +180,14 @@ export class AdbManager {
       });
       await this.termuxCmd(`rm pipe; mkfifo pipe; sleep 2`);
       this.termuxCmd(`bash ${tmpdir}/zipstart.sh`);
-      await this.termuxCmd(`sleep 5; cat pipe`);
+      await this.termuxCmd(`sleep 1; cat pipe`);
       console.log("exited?");
 
       let socket = await this.adb.createSocket("tcp:12345");
       this.mouseWriter = socket.writable.getWriter() as any;
 
       // GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0
-      prootCmd("PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
+      await this.termuxCmd("proot-distro login debian --shared-tmp -- PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
   }
 
   async termuxCmd(cmd: string): Promise<number> {
