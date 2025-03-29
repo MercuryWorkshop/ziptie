@@ -29,17 +29,37 @@ export const state = $state({
 
 const Launcher: Component<{
   launch: (app: string) => void,
+}, {
+  searchText: string,
+  filteredApps: NativeApp[],
 }> = function() {
+  this.searchText = "";
+  
   this.css = `
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 1em;
+  display: flex;
+  flex-direction: column;
   background-color: black;
   overflow-y: auto;
   overflow-x: hidden;
   width: 100%;
   height: 100%;
   padding: 1em;
+  gap: 1em;
+
+  .search {
+    width: 100%;
+    padding: 0.5em;
+    border: none;
+    border-radius: 0.5em;
+    font-size: 1.2em;
+    background: white;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 1em;
+  }
 
   button {
     aspect-ratio: 1;
@@ -70,19 +90,44 @@ const Launcher: Component<{
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
+      line-clamp: 2;
       line-height: 1.2;
       max-height: 2.4em;
     }
   }
   `
 
+  useChange([state.apps, this.searchText], () => {
+    this.filteredApps = Object.values(state.apps)
+      .filter(app => app.packageName.toLowerCase().includes(this.searchText.toLowerCase()))
+  });
+
   return <div>
-    {use(state.apps, apps => Object.values(apps).map(app =>
-      <button on:click={() => this.launch(app.packageName)}>
-        <img src={app.icon} />
-        <span>{app.packageName}</span>
-      </button>
-    ))}
+    <input 
+      class="search" 
+      type="text" 
+      placeholder="Search apps..." 
+      on:input={(e: KeyboardEvent) => {
+        const target = e.target as HTMLInputElement;
+        this.searchText = target.value;
+      }}
+      on:keydown={(e: KeyboardEvent) => {
+        if (e.key == "Enter" && this.filteredApps.length > 0) {
+          this.launch(this.filteredApps[0].packageName);
+          e.preventDefault();
+        }
+        e.stopPropagation();
+      }}
+    />
+    <div class="grid">
+      {use(this.filteredApps, apps =>
+        apps.map(app =>
+          <button on:click={() => this.launch(app.packageName)}>
+            <img src={app.icon} />
+            <span>{app.packageName}</span>
+          </button>
+        ))}
+    </div>
   </div>
 }
 
@@ -230,10 +275,6 @@ overflow: hidden;
   `
 
   let terminal = <Terminal />;
-  const openApp = async (app: string) => {
-    this.client.controller!.startApp(app);
-    this.shown = "scrcpy";
-  }
 
   const connect = async () => {
     try {
@@ -310,11 +351,6 @@ overflow: hidden;
             state.showLauncher = true;
           }}>launcher</button>
           <button on:click={startx}>startx</button>
-          <button on:click={() => {
-            openApp("com.termux.x11")
-            this.scrcpy.$.showx11 = true;
-            this.shown = "scrcpy";
-          }}>termux</button>
           <button on:click={() => {
             this.shown = "terminal";
             this.scrcpy.$.showx11 = false;
