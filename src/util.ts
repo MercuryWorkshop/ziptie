@@ -30,7 +30,6 @@ export function createFramer(): TransformStream<Uint8Array, Uint8Array> {
             break;
           }
           currentSize = size;
-          console.log("size", size, currentPacket);
           currentPacket = currentPacket.slice(4);
         }
 

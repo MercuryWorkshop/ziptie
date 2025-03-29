@@ -220,7 +220,6 @@ export class AdbManager {
   }
 
   async parseResponse(json: any) {
-    console.log(json);
     switch (json.req) {
       case "apps":
         state.apps = json.data.packageInfos;
@@ -234,7 +233,6 @@ export class AdbManager {
         this.resolveCreateDisplay!(json);
         break;
     }
-    console.log(json);
   }
 
   async startLogcat() {
