@@ -9,7 +9,7 @@ import {
 } from "@yume-chan/scrcpy-decoder-webcodecs";
 import { AndroidKeyCode, AndroidKeyEventAction, AndroidKeyEventMeta, AndroidMotionEventAction, AndroidMotionEventButton, ScrcpyAudioCodec, ScrcpyControlMessageSerializer, ScrcpyControlMessageWriter } from "@yume-chan/scrcpy";
 import { OpusStream } from "./audio";
-import { state } from "./main";
+import { mgr, state } from "./main";
 
 function createVideoFrameRenderer(): {
   renderer: VideoFrameRenderer;
@@ -35,7 +35,6 @@ export const Scrcpy: Component<{
   expanded: boolean,
 }, {
   showx11: boolean,
-  connectdaemon: () => void,
 }> = function() {
   this.css = `
 height: 100%;
@@ -109,15 +108,6 @@ position: relative;
   }
 
   let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
-  const writeints = async (bytes: number[]) => {
-    if (writer == null) return;
-    await writer.write(new Uint8Array(Uint32Array.from(bytes).buffer));
-  }
-
-  this.connectdaemon = async () => {
-    // let socket = await adb.createSocket("tcp:12345");
-    // writer = socket.writable.getWriter() as any;
-  }
 
   const startController = async (video: HTMLVideoElement, controller: ScrcpyControlMessageWriter) => {
     const injectKeyCode = (e: KeyboardEvent) => {
@@ -131,7 +121,7 @@ position: relative;
         let keyCode = jsToX11Keycode[e.keyCode];
         if (keyCode == undefined) return;
 
-        writeints([0, keyCode, state, 0, 0]);
+        mgr.writeMouseCmd([0, keyCode, state, 0, 0]);
       } else {
         let action: AndroidKeyEventAction;
         switch (type) {
@@ -166,7 +156,7 @@ position: relative;
       e.stopPropagation()
 
       if (this.showx11) {
-        writeints([2, e.deltaX, e.deltaY, 0, 0]);
+        mgr.writeMouseCmd([2, e.deltaX, e.deltaY, 0, 0]);
       } else {
         controller.injectScroll({
           ...getPointer(video, e.clientX, e.clientY),
@@ -202,13 +192,13 @@ position: relative;
         ];
         switch (type) {
           case "pointermove":
-            await writeints([1, pointerX, pointerY, -1, 0]);
+            await mgr.writeMouseCmd([1, pointerX, pointerY, -1, 0]);
             break;
           case "pointerdown":
-            await writeints([1, pointerX, pointerY, jsButtonToX[e.button], 1]);
+            await mgr.writeMouseCmd([1, pointerX, pointerY, jsButtonToX[e.button], 1]);
             break;
           case "pointerup":
-            await writeints([1, pointerX, pointerY, jsButtonToX[e.button], 0]);
+            await mgr.writeMouseCmd([1, pointerX, pointerY, jsButtonToX[e.button], 0]);
             break;
         }
       } else {

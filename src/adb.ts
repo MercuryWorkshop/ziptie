@@ -10,7 +10,7 @@ import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcp
 import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
 import { MaybeConsumable, pipeFrom, PushReadableStream, ReadableStream, StructDeserializeStream, WrapReadableStream, WrapWritableStream } from '@yume-chan/stream-extra';
 import { Logcat, AndroidLogEntry } from '@yume-chan/android-bin';
-import { debug, state } from './main';
+import { debug, mgr, state } from './main';
 
 export enum VirtualDisplayMode {
   None,
@@ -140,7 +140,9 @@ import server from "../release-0.0.0.apk?arraybuffer"
 import { createFramer, mkstream } from './util';
 let tmpdir = "/data/local/tmp";
 export class AdbManager {
-  socketWriter: WritableStreamDefaultWriter<MaybeConsumable<Uint8Array>> | undefined;
+  jarWriter: WritableStreamDefaultWriter<MaybeConsumable<Uint8Array>> | undefined;
+  mouseWriter: WritableStreamDefaultWriter<Uint8Array> | undefined;
+  
   displayId: number = 0
   scrcpy: AdbScrcpyClient | undefined
   resolveCreateDisplay: ((value: unknown) => void) | undefined
@@ -208,6 +210,38 @@ export class AdbManager {
 
   }
 
+  async startX11() {
+      await this.fs.write({
+        filename: tmpdir + "/zipmouse.c",
+        file: mkstream(zipmouse)
+      })
+      await this.fs.write({
+        filename: tmpdir + "/zipstart.sh",
+        file: mkstream(zipstart)
+      });
+      await this.termuxCmd(`rm pipe; mkfifo pipe; sleep 2`);
+      this.termuxCmd(`bash ${tmpdir}/zipstart.sh`);
+      await this.termuxCmd(`sleep 5; cat pipe`);
+      console.log("exited?");
+
+      let socket = await this.adb.createSocket("tcp:12345");
+      this.mouseWriter = socket.writable.getWriter() as any;
+
+      // GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0
+      prootCmd("PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
+  }
+
+  async termuxCmd(cmd: string): Promise<number> {
+    let e = await this.adb.subprocess.spawn(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
+    logProcess(e);
+    return await e.exit;
+  }
+
+  async writeMouseCmd(bytes: number[]) {
+    if (!this.mouseWriter) throw new Error("mouse writer not open");
+    await this.mouseWriter.write(new Uint8Array(Uint32Array.from(bytes).buffer));
+  }
+
   async openApp(packageName: string) {
     await this.sendCommand({ req: "launch", packageName, displayId: this.displayId });
   }
@@ -217,13 +251,13 @@ export class AdbManager {
   }
 
   async sendCommand(json: any) {
-    if (!this.socketWriter) throw new Error("socket not open");
+    if (!this.jarWriter) throw new Error("socket not open");
     let text = new TextEncoder().encode(JSON.stringify(json));
     let ab = new Uint8Array(text.length + 4);
     let dv = new DataView(ab.buffer);
     dv.setUint32(0, text.length);
     ab.set(text, 4);
-    this.socketWriter.write(ab);
+    this.jarWriter.write(ab);
   }
 
   async parseResponse(json: any) {
@@ -263,7 +297,7 @@ export class AdbManager {
     logProcess(e);
     await new Promise(resolve => setTimeout(resolve, 1000));
     let socket = await this.adb.createSocket("localabstract:ziptie");
-    this.socketWriter = socket.writable.getWriter();
+    this.jarWriter = socket.writable.getWriter();
     let td = new TextDecoder();
     let t = this;
     socket.readable.pipeThrough(createFramer() as any).pipeTo(new WritableStream({

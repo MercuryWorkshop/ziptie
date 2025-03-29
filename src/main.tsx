@@ -328,28 +328,6 @@ overflow: hidden;
     await mgr.setSetting("global", "animator_duration_scale", "0");
       
   }
-  const startx = async () => {
-    let fs = await mgr.sync();
-
-    await fs.write({
-      filename: tmpdir + "/zipmouse.c",
-      file: mkstream(zipmouse)
-    })
-    await fs.write({
-      filename: tmpdir + "/zipstart.sh",
-      file: mkstream(zipstart)
-    });
-    await termuxCmd(`rm pipe; mkfifo pipe; sleep 2`);
-    termuxCmd(`bash ${tmpdir}/zipstart.sh`);
-    await termuxCmd(`sleep 2; cat pipe`);
-    console.log("exited?");
-
-
-    this.scrcpy.$.connectdaemon();
-
-    // GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0
-    prootCmd("PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
-  };
 
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Meta') {
@@ -373,7 +351,12 @@ overflow: hidden;
             e.stopPropagation();
             launcher.$.show();
           }}>launcher</button>
-          <button on:click={startx}>startx</button>
+          <button on:click={()=>mgr.startX11()}>startx</button>
+          <button on:click={()=>{
+            mgr.openApp("com.termux.x11");
+            this.shown = "scrcpy";
+            this.scrcpy.$.showx11 = true;
+          }}>x11</button>
           <button on:click={() => {
             this.shown = "terminal";
             this.scrcpy.$.showx11 = false;
