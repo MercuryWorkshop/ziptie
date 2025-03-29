@@ -220,9 +220,10 @@ export class AdbManager {
   }
 
   async parseResponse(json: any) {
+    console.log("parseResponse", json);
     switch (json.req) {
       case "apps":
-        state.apps = json.data.packageInfos;
+        state.apps = json.packageInfos;
         break;
       case "openapps":
         state.openApps = json.data;
@@ -263,6 +264,8 @@ export class AdbManager {
         t.parseResponse(resp);
       }
     }) as any);
+
+    setTimeout(() => this.sendCommand({ req: "apps" }), 3000);
   }
 
   static async connect() {

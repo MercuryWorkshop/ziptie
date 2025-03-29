@@ -136,7 +136,7 @@ const Launcher: Component<{
             this.searchText = ""
           }}>
             <img src={app.icon} />
-            <span>{app.packageName}</span>
+            <span>{app.label}</span>
           </button>
         ))}
     </div>
