@@ -1,418 +1,482 @@
+import "dreamland";
+
 import { AdbScrcpyClient } from '@yume-chan/adb-scrcpy';
 import { AdbManager, gDisplayId, logProcess, prootCmd, startScrcpy, termuxCmd, termuxShell } from './adb';
 import './style.css'
-import "dreamland";
 import { AndroidKeyCode, AndroidKeyEventAction } from '@yume-chan/scrcpy';
 import { Scrcpy } from './scrcpy';
 import { AdbSocket } from '@yume-chan/adb';
+import { Terminal } from './Terminal';
+import { proxyInitLibcurl, proxyLoadPage } from './proxy';
 
+import type { IconifyIcon } from "@iconify/types";
+import { Button, Card, CardClickable, Dialog, FAB, Icon, NavList, NavListButton, StyleFromParams, Switch, TextField } from 'm3-dreamland';
+
+import iconPhonelinkSetup from "@ktibow/iconset-material-symbols/phonelink-setup";
+import iconPhonelinkSetupOutline from "@ktibow/iconset-material-symbols/phonelink-setup-outline";
+import iconCodeBlocks from "@ktibow/iconset-material-symbols/code-blocks";
+import iconCodeBlocksOutline from "@ktibow/iconset-material-symbols/code-blocks-outline";
+import iconMonitor from "@ktibow/iconset-material-symbols/monitor";
+import iconMonitorOutline from "@ktibow/iconset-material-symbols/monitor-outline";
+import iconTerminal from "@ktibow/iconset-material-symbols/terminal";
+import iconSmartphone from "@ktibow/iconset-material-symbols/smartphone";
+import iconSmartphoneOutline from "@ktibow/iconset-material-symbols/smartphone-outline";
+
+import iconApps from "@ktibow/iconset-material-symbols/apps";
 
 export const debug: any = {};
 (window as any).dbg = debug;
-
-
 export let mgr: AdbManager;
-
-
-
-
-import { Terminal } from './Terminal';
-import { proxyInitLibcurl, proxyLoadPage } from './proxy';
-type NativeApp = any
 export const state = $state({
-  connected: false,
-  apps: {} as Record<string, NativeApp>,
-  openApps: [] as string[],
-  showLauncher: false,
+	connected: false,
+	apps: [] as NativeApp[],
+	openApps: [] as string[],
+	showLauncher: false,
+
+	content: null! as HTMLElement,
+
+	scrcpy: null! as ComponentElement<typeof Scrcpy>,
+	terminal: <Terminal />,
 });
 
+async function connect(opts: SetupOpts) {
+	try {
+		mgr = await AdbManager.connect();
+	} catch (error) {
+		alert(error);
+		throw error;
+	}
+
+	await mgr.startLogcat();
+	await mgr.startNative();
+
+	await mgr.startScrcpy(state.content);
+
+	state.connected = true;
+	state.scrcpy = <Scrcpy client={mgr.scrcpy!} />;
+	state.terminal.$.start();
+	state.scrcpy.$.showx11 = false;
+
+	if (opts.disablecharge) {
+		let setcharge = await mgr.adb.subprocess.spawnAndWait("dumpsys battery unplug");
+		if (setcharge.exitCode != 0) {
+			console.error("failed to disable charging");
+		}
+	} else {
+		let setcharge = await mgr.adb.subprocess.spawnAndWait("dumpsys battery reset");
+		if (setcharge.exitCode != 0) {
+			console.error("failed to reset charging");
+		}
+	}
+	if (opts.disableanim) {
+		await mgr.setSetting("global", "window_animation_scale", "0");
+		await mgr.setSetting("global", "transition_animation_scale", "0");
+		await mgr.setSetting("global", "animator_duration_scale", "0");
+	}
+}
+
+type NativeApp = {
+	apkPath: string,
+	apkSize: number,
+	enabled: boolean,
+	firstInstallTime: number,
+	lastUpdateTime: number,
+	icon: string,
+	label: string,
+	packageName: string,
+	versionName: string,
+	signatures: string[],
+	system: boolean,
+	targetSdkVersion: number,
+};
+
+const NativeAppView: Component<{ app: NativeApp, }> = function() {
+	this.css = `
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+
+		gap: 0.5em;
+
+		img {
+			width: 64px;
+			height: 64px;
+		}
+
+		.info {
+			text-align: center;
+			overflow-wrap: anywhere;
+		}
+	`;
+
+	return (
+		<div>
+			<img src={this.app.icon} />
+			<div class="info">
+				<div>{this.app.label}</div>
+				<div class="m3-font-label-medium">{this.app.versionName}</div>
+			</div>
+		</div>
+	)
+}
 
 const Launcher: Component<{
-  launch: (app: string) => void,
+	launch: (app: string) => void,
 }, {
-  searchText: string,
-  filteredApps: NativeApp[],
-},{
-  show: () => void,
+	searchText: string,
+	filteredApps: NativeApp[],
 }> = function() {
-  this.searchText = "";
-  
-  this.show = () => {
-    state.showLauncher = true;
-    const searchInput = document.querySelector('.search') as HTMLInputElement;
-    if (searchInput) searchInput.focus();
-  };
-  
-  this.css = `
-  display: flex;
-  flex-direction: column;
-  background-color: black;
-  overflow-y: auto;
-  overflow-x: hidden;
-  width: 100%;
-  height: 100%;
-  padding: 1em;
-  gap: 1em;
+	this.searchText = "";
 
-  .search {
-    width: 100%;
-    padding: 0.5em;
-    border: none;
-    border-radius: 0.5em;
-    font-size: 1.2em;
-    background: white;
-  }
+	useChange([state.apps, this.searchText], () => {
+		console.log(state.apps);
+		this.filteredApps = Object.values(state.apps)
+			.filter(app => app.packageName.toLowerCase().includes(this.searchText.toLowerCase()))
+	});
 
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 1em;
-  }
+	this.css = `
+		display: flex;
+		flex-direction: column;
+		gap: 1em;
 
-  button {
-    aspect-ratio: 1;
-    background-color: white;
-    border: none;
-    padding: 0.5em;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.5em;
-    transition: transform 0.2s ease;
+		.grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+			gap: 1em;
+		}
 
-    &:hover {
-      transform: scale(1.05);
-    }
+		.CardClickable-m3-container {
+			width: 100%;
+			height: 100%;
+			justify-content: center;
+		}
+	`;
 
-    img {
-      width: 48px;
-      height: 48px;
-      margin-bottom: 0.5em;
-    }
+	return (
+		<div>
+			<TextField
+				name="App name"
+				bind:value={use(this.searchText)}
+				display="block"
+			/>
+			<div class="grid">
+				{use(this.filteredApps, x => x.map(x => (
+					<CardClickable type="filled" on:click={() => {
+						this.launch(x.packageName);
+						this.searchText = "";
+					}}>
+						<NativeAppView app={x} />
+					</CardClickable>
+				)))}
+			</div>
+		</div>
+	)
+}
 
-    span {
-      font-size: 0.8em;
-      text-align: center;
-      word-break: break-word;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-clamp: 2;
-      line-height: 1.2;
-      max-height: 2.4em;
-    }
-  }
-  `
+type SetupOpts = {
+	disableanim: boolean,
+	disablecharge: boolean,
+};
 
-  useChange([state.apps, this.searchText], () => {
-    this.filteredApps = Object.values(state.apps)
-      .filter(app => app.packageName.toLowerCase().includes(this.searchText.toLowerCase()))
-  });
+const SetupToggle: Component<{ val: boolean, title: string }> = function() {
+	this.css = `
+		display: flex;
+		gap: 0.5em;
+		align-items: center;
 
-  return <div>
-    <input 
-      class="search" 
-      type="text" 
-      placeholder="Search apps..." 
-      on:input={(e: KeyboardEvent) => {
-        const target = e.target as HTMLInputElement;
-        this.searchText = target.value;
-      }}
-      on:keydown={(e: KeyboardEvent) => {
-        if (e.key == "Enter" && this.filteredApps.length > 0) {
-          this.launch(this.filteredApps[0].packageName);
-          e.preventDefault();
-          this.searchText = "";
-        }
-        e.stopPropagation();
-      }}
-    />
-    <div class="grid">
-      {use(this.filteredApps, apps =>
-        apps.map(app =>
-          <button on:click={() => {
-            this.launch(app.packageName)
-            this.searchText = ""
-          }}>
-            <img src={app.icon} />
-            <span>{app.label}</span>
-          </button>
-        ))}
-    </div>
-  </div>
+		label {
+			height: 2rem;
+		}
+	`;
+
+	return (
+		<div>
+			<Switch bind:checked={use(this.val)} />
+			{this.title}
+		</div>
+	)
+}
+
+const Setup: Component<{
+	"on:connect": (opts: SetupOpts) => void,
+}, {
+	disableanim: boolean,
+	disablecharge: boolean,
+}> = function() {
+	this.css = `
+		display: flex;
+		flex-direction: column;
+		gap: 1em;
+
+		padding: 1em;
+
+		.settings {
+			display: flex;
+			flex-direction: column;
+			gap: 1em;
+		}
+	`;
+
+	this.disableanim = false;
+	this.disablecharge = false;
+
+	const connect = () => {
+		const opts = {
+			disableanim: this.disableanim,
+			disablecharge: this.disablecharge,
+		};
+
+		this["on:connect"](opts);
+	}
+
+	return (
+		<div>
+			<div class="m3-font-headline-medium">Ziptie</div>
+			ziptie your android to your chromebook
+
+			<Card type="elevated">
+				<div class="settings">
+					<div class="m3-font-title-large">Settings</div>
+					<SetupToggle bind:val={use(this.disablecharge)} title="Disable charging" />
+					<SetupToggle bind:val={use(this.disableanim)} title="Disable animations" />
+				</div>
+			</Card>
+
+			<Button type="filled" iconType="left" on:click={connect}>
+				<Icon icon={iconPhonelinkSetup} />Connect
+			</Button>
+		</div>
+	)
+}
+
+const Settings: Component<{}, {
+
+}> = function() {
+	this.css = `
+		padding: 1em;
+	`;
+
+	return (
+		<div>
+			<div class="m3-font-headline-medium">Settings</div>
+			<Button type="tonal" on:click={() => mgr.startX11()}>startx</Button>
+			<Button type="tonal" on:click={() => {
+				if (document.fullscreenElement) {
+					document.exitFullscreen();
+				} else {
+					this.root.requestFullscreen();
+				}
+			}}>fullscreen</Button>
+		</div>
+	)
+}
+
+type Tabs = "scrcpy" | "terminal" | "code" | "settings";
+type TabRoute = {
+	cond: (tabs: Tabs) => boolean,
+	click: () => void,
+	label: string,
+	icon: IconifyIcon,
+	sicon: IconifyIcon,
+};
+
+const Nav: Component<{ shown: Tabs }, {}> = function() {
+	this.css = `
+		position: sticky;
+		top: 0;
+		left: 0;
+
+		align-self: flex-start;
+		display: flex;
+		width: 5rem;
+		flex-shrink: 0;
+		flex-direction: column;
+		min-height: 100vh;
+
+		.items {
+			display: flex;
+			flex-direction: column;
+			gap: 0.75rem;
+			justify-content: center;
+		}
+
+		.appdrawer {
+			position: absolute;
+			bottom: 2rem;
+		}
+	`;
+
+	const routes: TabRoute[] = [
+		{
+			label: "Screen",
+			icon: iconSmartphoneOutline,
+			sicon: iconSmartphone,
+			cond: x => x === "scrcpy",
+			click: () => this.shown = "scrcpy"
+		},
+		{
+			label: "X11",
+			icon: iconMonitorOutline,
+			sicon: iconMonitor,
+			cond: x => x === "scrcpy" && state.scrcpy.$.showx11,
+			click: () => {
+				mgr.openApp("com.termux.x11");
+				this.shown = "scrcpy";
+				state.scrcpy.$.showx11 = true;
+			}
+		},
+		{
+			label: "VSCode",
+			icon: iconCodeBlocksOutline,
+			sicon: iconCodeBlocks,
+			cond: x => x === "code",
+			click: async () => {
+				console.log("loading page");
+				await proxyInitLibcurl();
+				this.shown = "code";
+			}
+		},
+		{
+			label: "Terminal",
+			icon: iconTerminal,
+			sicon: iconTerminal,
+			cond: x => x === "terminal",
+			click: () => this.shown = "terminal",
+		},
+		{
+			label: "Settings",
+			icon: iconPhonelinkSetupOutline,
+			sicon: iconPhonelinkSetup,
+			cond: x => x === "settings",
+			click: () => this.shown = "settings"
+		}
+	];
+
+	return (
+		<div>
+			<NavList type="rail">
+				<div class="items">
+					{routes.map(x => (
+						<NavListButton
+							type="rail"
+							icon={use(this.shown, y => x.cond(y) ? x.sicon : x.icon)}
+							selected={use(this.shown, y => x.cond(y))}
+							on:click={x.click}
+						>
+							{x.label}
+						</NavListButton>
+					))}
+				</div>
+				<div class="appdrawer">
+					<FAB
+						icon={iconApps}
+						color="primary"
+						on:click={() => {
+							state.showLauncher = true;
+						}}
+					/>
+				</div>
+			</NavList>
+		</div>
+	)
+}
+
+const Main: Component<{}, {
+	shown: Tabs,
+	codeframe: HTMLIFrameElement,
+	content: HTMLElement,
+}> = function() {
+	this.css = `
+		display: flex;
+
+		.content {
+			flex: 1;
+		}
+
+		dialog:has(.Dialog-m3-container) {
+			width: 75vw;
+			height: 75vh;
+			max-width: unset;
+		}
+
+		.apps-actions {
+			display: flex;
+			align-items: flex-end;
+
+			margin-bottom: 1em;
+		}
+	`;
+
+	let launcher = <Launcher launch={(name: string) => {
+		this.shown = "scrcpy";
+		mgr.openApp(name);
+		state.scrcpy.$.showx11 = false;
+		state.showLauncher = false;
+	}} />
+	this.shown = "settings";
+
+	this.mount = () => {
+		state.content = this.content;
+	}
+
+	return (
+		<div>
+			<Dialog
+				headline="Apps"
+				bind:open={use(state.showLauncher)}
+
+				closeOnClick={false}
+			>
+				{launcher}
+				<div class="apps-actions">
+					<Button type="tonal" on:click={() => state.showLauncher = false}>Close</Button>
+				</div>
+			</Dialog>
+
+			<Nav bind:shown={use(this.shown)} />
+			<div class="content" bind:this={use(this.content)}>
+				{use(this.shown, (x: Tabs) => {
+					if (x !== "scrcpy" && state.scrcpy) {
+						state.scrcpy.$.showx11 = false;
+					}
+
+					if (x === "scrcpy") {
+						return state.scrcpy;
+					} else if (x === "terminal") {
+						return state.terminal;
+					} else if (x === "code") {
+						proxyLoadPage(this.codeframe, "http://localhost:8080", "http://localhost:8080");
+						return this.codeframe;
+					} else if (x === "settings") {
+						return <Settings />;
+					}
+				})}
+			</div>
+		</div>
+	)
 }
 
 const App: Component<{}, {
-  scrcpy: ReturnType<typeof Scrcpy>,
-  client: AdbScrcpyClient,
-  expanded: boolean,
-  shown: "scrcpy" | "terminal" | "code" | "none",
-  codeframe: HTMLIFrameElement,
-  disablecharge: boolean,
-  noui: boolean,
+	shown: HTMLElement,
 }> = function() {
-  this.css = `
-overflow: hidden;
-  .container {
-    overflow: hidden;
-    position: absolute;
-    width: 100%;
-    height: 100%;
-  }
-  #scrcpycontainer {
-    display: none;
-  }
-  #scrcpycontainer.visible {
-    display: block;
-  }
-  #terminal {
-    display: none;
-  }
-  #terminal.visible {
-    display: block;
-  }
-  .center {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    width: 100%;
-    z-index: 2;
-  button {
-    width: 100%;
-    height: 6em;
-    border-radius: 0.5em;
-  }
-  }
-  .controls {
-    display: flex;
-    flex-direction: column;
-    gap: 1em;
-    border-radius: 1em;
-    border: 2px solid black;
-    padding: 1em;
-  }
+	this.shown = <Setup on:connect={async (opts) => {
+		this.shown = <Main />;
+		await connect(opts);
+	}} />
+	//this.shown = <Main />;
 
-  .launcher {
-    width: 60%;
-    height: 60%;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-  }
-
-  .launcher.visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .launcher-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-    z-index: 0;
-  }
-
-  .launcher-backdrop.visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  #sidebar {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    left: 0;
-    z-index: 2;
-    width: 0em;
-    height: 80%;
-    border-top-right-radius: 1em;
-    border-bottom-right-radius: 1em;
-    background-color: white;
-  }
-  #sidebar .contents {
-    display: flex;
-    flex-direction: column;
-    gap: 1em;
-    overflow: hidden;
-    padding: 1em;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-  }
-  #sidebar.expanded .contents {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  #sidebar.expanded {
-    width: 5em;
-    display: flex;
-    border: 2px solid black;
-  }
-  #sidebar .contents button {
-    aspect-ratio: 1;
-    height: auto;
-    padding: 0.5em;
-  }
-  #handle {
-    position: absolute;
-    top: 50%;
-    transform: translate(100%, -50%);
-    right: 0;
-    height: 6em;
-    width: 1em;
-    background-color: white;
-    border: 2px solid black;
-    border-top-right-radius: 1em;
-    border-bottom-right-radius: 1em;
-  }
-  iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-  }
-  `
-
-  let terminal = <Terminal />;
-  let launcher = <Launcher launch={(name: string) => {
-    this.shown = "scrcpy";
-    mgr.openApp(name);
-    this.scrcpy.$.showx11 = false;
-    state.showLauncher = false;
-  }} />
-
-  const connect = async () => {
-    try {
-      mgr = await AdbManager.connect();
-    } catch (error) {
-      alert(error);
-      return;
-    }
-
-    await mgr.startLogcat();
-    await mgr.startNative();
-
-    await mgr.startScrcpy();
-
-    state.connected = true;
-    this.scrcpy = <Scrcpy client={mgr.scrcpy!} />;
-    terminal.$.start();
-
-    this.shown = "none";
-    this.scrcpy.$.showx11 = false;
-    launcher.$.show();
-
-    if (this.disablecharge) {
-      let setcharge = await mgr.adb.subprocess.spawnAndWait("dumpsys battery unplug");
-      if (setcharge.exitCode != 0) {
-        console.error("failed to disable charging");
-      }
-    } else {
-      let setcharge = await mgr.adb.subprocess.spawnAndWait("dumpsys battery reset");
-      if (setcharge.exitCode != 0) {
-        console.error("failed to reset charging");
-      }
-    }
-    await mgr.setSetting("global", "window_animation_scale", "0");
-    await mgr.setSetting("global", "transition_animation_scale", "0");
-    await mgr.setSetting("global", "animator_duration_scale", "0");
-      
-  }
-
-  document.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (this.scrcpy.$.showx11) {
-      return;
-    }
-    if (e.key === 'Meta') {
-      launcher.$.show();
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }, {
-    capture: true,
-  });
-
-  return <div id="app">
-    <div class="container">
-      <div id="sidebar" class:expanded={use(this.expanded)} on:click={() => state.showLauncher = false}>
-        <div id="handle" on:click={() => {
-          this.expanded = !this.expanded;
-        }} />
-
-        <div class="contents">
-          <button on:click={(e: MouseEvent) => {
-            e.stopPropagation();
-            launcher.$.show();
-          }}>launcher</button>
-          <button on:click={()=>mgr.startX11()}>startx</button>
-          <button on:click={()=>{
-            if (document.fullscreenElement) {
-              document.exitFullscreen();
-            } else {
-              this.root.requestFullscreen();
-            }
-          }}>fullscreen</button>
-          <button on:click={()=>{
-            mgr.openApp("com.termux.x11");
-            this.shown = "scrcpy";
-            this.scrcpy.$.showx11 = true;
-          }}>x11</button>
-          <button on:click={() => {
-            this.shown = "terminal";
-            this.scrcpy.$.showx11 = false;
-          }}>terminal</button>
-          <button on:click={() => {
-            this.shown = "code";
-            this.scrcpy.$.showx11 = false;
-          }}>code</button>
-          <button on:click={async () => {
-            // prootCmd("code-server --auth none");
-            console.log("loading page");
-            await proxyInitLibcurl();
-            await proxyLoadPage(this.codeframe, "http://localhost:8080", "http://localhost:8080");
-          }}>start codeserver</button>
-        </div>
-      </div>
-      <div id="scrcpycontainer" class:visible={use(this.shown, s => s == "scrcpy")}>
-        {use(this.scrcpy)}
-      </div>
-      <div class="launcher-backdrop" class:visible={use(state.showLauncher)} on:click={() => state.showLauncher = false} />
-      <div class="launcher" class:visible={use(state.showLauncher)}>
-        {launcher}
-      </div>
-      {$if(use(this.shown, s => s == "terminal"),
-        terminal
-      )}
-      <iframe bind:this={use(this.codeframe)} class:visible={use(this.shown, s => s == "code")} />
-    </div>
-    {$if(use(state.connected, s => !s),
-      <div class="center">
-        <div class="controls">
-          <button on:click={connect}>connect adb</button>
-          <label>disable charging</label>
-          <input type="checkbox" bind:checked={use(this.disablecharge)} />
-        </div>
-      </div>
-    )}
-  </div>
+	return (
+		<div id="app">
+			<StyleFromParams scheme="vibrant" contrast={0} color="CBA6F7" />
+			{use(this.shown)}
+		</div>
+	)
 }
 
 const root = document.getElementById("app")!;
 try {
-  root.replaceWith(<App />);
+	root.replaceWith(<App />);
 } catch (err) {
-  console.log(err);
-  root.replaceWith(document.createTextNode(`Failed to load: ${err}`));
+	console.log(err);
+	root.replaceWith(document.createTextNode(`Failed to load: ${err}`));
 }

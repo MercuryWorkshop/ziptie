@@ -82,8 +82,8 @@ export class AdbManager {
 
   constructor(public adb: Adb, public fs: AdbSync) { }
 
-  async startScrcpy() {
-    this.sendCommand({ req: "createDisplay", width: window.innerWidth, height: window.innerHeight, density: this.density });
+  async startScrcpy(content: HTMLElement) {
+    this.sendCommand({ req: "createDisplay", width: content.clientWidth, height: content.clientHeight, density: this.density });
     await new Promise(resolve => this.resolveCreateDisplay = resolve);
 
     const server = await fetch(BIN);
@@ -157,13 +157,13 @@ export class AdbManager {
       } catch { }
     }, 500);
 
-    let oldInnerWidth = window.innerWidth;
-    let oldInnerHeight = window.innerHeight;
+    let oldInnerWidth = content.clientWidth;
+    let oldInnerHeight = content.clientHeight;
     setInterval(() => {
-      if (window.innerWidth != oldInnerWidth || window.innerHeight != oldInnerHeight) {
-        this.sendCommand({ req: "resizeDisplay", displayId: this.displayId, width: window.innerWidth, height: window.innerHeight, density: this.density });
-        oldInnerHeight = window.innerHeight;
-        oldInnerWidth = window.innerWidth;
+      if (content.clientWidth != oldInnerWidth || content.clientHeight != oldInnerHeight) {
+        this.sendCommand({ req: "resizeDisplay", displayId: this.displayId, width: content.clientWidth, height: content.clientHeight, density: this.density });
+        oldInnerHeight = content.clientHeight;
+        oldInnerWidth = content.clientWidth;
       }
     }, 100);
 

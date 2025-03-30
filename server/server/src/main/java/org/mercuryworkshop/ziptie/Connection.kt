@@ -274,7 +274,7 @@ class Connection(private val client: LocalSocket) : Thread() {
                             file.writeBytes(pngIcon)
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to get icon for $packageName")
+                        Log.e(TAG, "Failed to get icon for $packageName $e")
                     }
                 }
                 val cacheInfo = JSONObject()

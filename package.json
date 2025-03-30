@@ -9,10 +9,12 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@iconify/types": "^2.0.0",
     "typescript": "~5.7.2",
     "vite": "^6.2.0"
   },
   "dependencies": {
+    "@ktibow/iconset-material-symbols": "^0.0.1742538575",
     "@types/w3c-web-usb": "^1.0.10",
     "@xterm/addon-clipboard": "^0.1.0",
     "@xterm/addon-fit": "^0.10.0",
@@ -30,6 +32,7 @@
     "@yume-chan/stream-extra": "^1.0.0",
     "dreamland": "^0.0.25",
     "libcurl.js": "^0.7.0",
+    "m3-dreamland": "github:mercuryworkshop/m3-dreamland",
     "vite-plugin-singlefile": "^2.1.0"
   }
 }
