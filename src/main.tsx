@@ -317,12 +317,17 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 
 		align-self: flex-start;
 		display: flex;
-		width: 5rem;
 		flex-shrink: 0;
 		flex-direction: column;
 		min-height: 100vh;
+		padding-top: 1rem;
+		padding-left: 0.25rem;
+		padding-right: 0.25rem;
+		min-width: 4rem;
+		gap: 1rem;
 
 		.items {
+			justify-self: top;
 			display: flex;
 			flex-direction: column;
 			gap: 0.75rem;
@@ -330,8 +335,32 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 		}
 
 		.appdrawer {
-			position: absolute;
-			bottom: 2rem;
+			display: flex;
+			justify-content: center;
+			flex-direction: column;
+			align-items: center;
+			gap: 1rem;
+			button {
+				height: 48px;
+				width: min-content;
+				border-radius: 50%;
+				border: none;
+				background-color: transparent;
+				padding: 0;
+				aspect-ratio: 1/1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				img {
+					object-fit: cover;
+					width: 100%;
+					height: 100%;
+				}
+			}
+		}
+
+		div > div {
+			height: 100%;
 		}
 	`;
 
@@ -386,29 +415,34 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 
 	return (
 		<div>
-			<NavList type="rail">
-				<div class="items">
-					{routes.map(x => (
-						<NavListButton
-							type="rail"
-							icon={use(this.shown, y => x.cond(y) ? x.sicon : x.icon)}
-							selected={use(this.shown, y => x.cond(y))}
-							on:click={x.click}
-						>
-							{x.label}
-						</NavListButton>
-					))}
-				</div>
-				<div class="appdrawer">
-					<FAB
-						icon={iconApps}
-						color="primary"
-						on:click={() => {
-							state.showLauncher = true;
-						}}
-					/>
-				</div>
-			</NavList>
+			<div class="items">
+				{routes.map(x => (
+					<NavListButton
+						type="rail"
+						icon={use(this.shown, y => x.cond(y) ? x.sicon : x.icon)}
+						selected={use(this.shown, y => x.cond(y))}
+						on:click={x.click}
+					>
+						{x.label}
+					</NavListButton>
+				))}
+			</div>
+			<div class="appdrawer">
+				{use(store.apps, x => x.slice(0, 5).map(x => (
+					<button>
+						<img src={x.icon} />
+					</button>
+				)))}
+
+				<FAB
+					size="small"
+					icon={iconApps}
+					color="primary"
+				on:click={() => {
+					state.showLauncher = true;
+				}}
+				/>
+			</div>
 		</div>
 	)
 }
