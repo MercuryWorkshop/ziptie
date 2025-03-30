@@ -341,7 +341,10 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 			icon: iconSmartphoneOutline,
 			sicon: iconSmartphone,
 			cond: x => x === "scrcpy" && !state.showx11,
-			click: () => this.shown = "scrcpy"
+			click: () => {
+				state.showx11 = false;
+				this.shown = "scrcpy";
+			}
 		},
 		{
 			label: "X11",
@@ -350,8 +353,8 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 			cond: x => x === "scrcpy" && state.showx11,
 			click: () => {
 				mgr.openApp("com.termux.x11");
-				this.shown = "scrcpy";
 				state.showx11 = true;
+				this.shown = "scrcpy";
 			}
 		},
 		{
@@ -417,10 +420,10 @@ const Main: Component<{}, {
 }> = function() {
 	this.css = `
 		display: flex;
-
 		.content {
 			flex: 1;
 			min-width: 0;
+			position: relative;
 		}
 
 		dialog:has(.Dialog-m3-container) {
@@ -434,6 +437,20 @@ const Main: Component<{}, {
 			align-items: flex-end;
 
 			margin-bottom: 1em;
+		}
+
+		#codeframe {
+			width: 100%;
+			height: 100%;
+			border: none;
+			visibility: hidden;
+			position: absolute;
+			top: 0;
+			left: 0;
+			background-color: #000;
+		}
+		#codeframe.visible {
+			visibility: visible;
 		}
 	`;
 
@@ -469,6 +486,14 @@ const Main: Component<{}, {
 		capture: true,
 	});
 
+	let loadedFrame = false;
+	useChange(this.shown, (x: Tabs) => {
+		if (x === "code" && !loadedFrame) {
+			proxyLoadPage(this.codeframe, "http://localhost:8080", "http://localhost:8080");
+			loadedFrame = true;
+		}
+	});
+
 	return (
 		<div>
 			<Dialog
@@ -484,6 +509,7 @@ const Main: Component<{}, {
 
 			<Nav bind:shown={use(this.shown)} />
 			<div class="content" bind:this={use(this.content)}>
+				<iframe id="codeframe" bind:this={use(this.codeframe)} class:visible={use(this.shown, x => x === "code")}/>
 				{use(this.shown, (x: Tabs) => {
 					if (x !== "scrcpy" && state.scrcpy) {
 						state.showx11 = false;
@@ -494,8 +520,7 @@ const Main: Component<{}, {
 					} else if (x === "terminal") {
 						return state.terminal;
 					} else if (x === "code") {
-						proxyLoadPage(this.codeframe, "http://localhost:8080", "http://localhost:8080");
-						return this.codeframe;
+						//...
 					} else if (x === "settings") {
 						return <Settings />;
 					}

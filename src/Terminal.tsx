@@ -14,6 +14,7 @@ export const Terminal: Component<{}, {
   this.css = `
   width: 100%;
   height: 100%;
+  background-color: #000;
   #terminal {
     width: 100%;
     height: 100%;
