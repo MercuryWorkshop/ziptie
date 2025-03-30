@@ -135,7 +135,6 @@ const Launcher: Component<{
 	this.searchText = "";
 
 	useChange([store.apps, this.searchText], () => {
-		console.log(store.apps);
 		this.filteredApps = store.apps
 			.filter(app => app.packageName.toLowerCase().includes(this.searchText.toLowerCase()))
 	});
@@ -431,8 +430,7 @@ const Main: Component<{}, {
 			<Dialog
 				headline="Apps"
 				bind:open={use(state.showLauncher)}
-
-				closeOnClick={false}
+				closeOnClick={true}
 			>
 				{launcher}
 				<div class="apps-actions">
