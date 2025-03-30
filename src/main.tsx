@@ -29,7 +29,7 @@ export const debug: any = {};
 export let mgr: AdbManager;
 export const state = $state({
 	connected: false,
-	openApps: [] as string[],
+	openApps: [] as { packageName: string, id: number, persistentId: number }[],
 	showLauncher: false,
 	showx11: false,
 
@@ -351,6 +351,12 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 				display: flex;
 				align-items: center;
 				justify-content: center;
+
+				cursor: pointer;
+				transition: transform 0.2s ease-in-out;
+				&:hover {
+					transform: scale(1.05);
+				}
 				img {
 					object-fit: cover;
 					width: 100%;
@@ -428,9 +434,14 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 				))}
 			</div>
 			<div class="appdrawer">
-				{use(store.apps, x => x.slice(0, 5).map(x => (
-					<button>
-						<img src={x.icon} />
+				{use(state.openApps, x => x.slice(0, 9).map(x => (
+					<button on:click={() => {
+						state.showx11 = false;
+						state.showLauncher = false;
+						this.shown = "scrcpy";
+						mgr.openApp(x.packageName);
+					}}>
+						<img src={store.apps.find(y => y.packageName === x.packageName)?.icon} />
 					</button>
 				)))}
 
@@ -469,7 +480,6 @@ const Main: Component<{}, {
 		.apps-actions {
 			display: flex;
 			align-items: flex-end;
-
 			margin-bottom: 1em;
 		}
 
@@ -486,6 +496,7 @@ const Main: Component<{}, {
 		#codeframe.visible {
 			visibility: visible;
 		}
+
 	`;
 
 	let launcher = <Launcher launch={(name: string) => {

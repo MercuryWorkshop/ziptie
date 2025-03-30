@@ -123,6 +123,24 @@ class Connection(private val client: LocalSocket) : Thread() {
         return JSONObject()
     }
 
+    private fun getOpenApps(): JSONObject {
+        val activityManager = ServiceManager.getActivityManager()
+        val tasks = activityManager.getRecentTasks(100, 0)
+        val openApps = JSONArray()
+
+        for (task in tasks) {
+            val info = JSONObject()
+            info.put("packageName", task.baseIntent.component?.packageName)
+            info.put("className", task.baseIntent.component?.className)
+            info.put("id", task.id)
+            info.put("persistentId", task.persistentId)
+            //info.put("displayId", task)
+            openApps.put(info)
+        }
+
+        return JSONObject(mapOf("req" to "openapps", "data" to openApps))
+    }
+
     override fun run() {
         // send(JSONObject(mapOf(
         //     "req" to "apps",
@@ -163,6 +181,7 @@ class Connection(private val client: LocalSocket) : Thread() {
                                             request["height"] as Int,
                                             request["density"] as Int
                                     )
+                            "openapps" -> getOpenApps()
                             else -> {
                                 throw Exception("invalid command")
                             }
@@ -181,6 +200,8 @@ class Connection(private val client: LocalSocket) : Thread() {
     private fun getVersion(): String {
         return BuildConfig.VERSION_NAME
     }
+
+    
 
 
     @TargetApi(Build.VERSION_CODES.P)
@@ -274,7 +295,7 @@ class Connection(private val client: LocalSocket) : Thread() {
                             file.writeBytes(pngIcon)
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to get icon for $packageName $e")
+                        Log.e(TAG, "Failed to get icon for $packageName")
                     }
                 }
                 val cacheInfo = JSONObject()

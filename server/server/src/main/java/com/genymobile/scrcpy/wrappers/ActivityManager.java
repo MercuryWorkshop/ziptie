@@ -18,6 +18,7 @@ import android.util.Log;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.List;
 
 @SuppressLint("PrivateApi,DiscouragedPrivateApi")
 public final class ActivityManager {
@@ -28,6 +29,7 @@ public final class ActivityManager {
     private Method removeContentProviderExternalMethod;
     private Method startActivityAsUserMethod;
     private Method forceStopPackageMethod;
+    private Method getRecentTasksMethod;
 
     static ActivityManager create() {
         try {
@@ -196,6 +198,47 @@ public final class ActivityManager {
             method.invoke(manager, packageName, /* userId */ /* UserHandle.USER_CURRENT */ -2);
         } catch (Throwable e) {
             Ln.e("Could not invoke method", e);
+        }
+    }
+
+    private Method getGetRecentTasksMethod() throws NoSuchMethodException {
+        if (getRecentTasksMethod == null) {
+            try {
+                // Try the newer API first
+                getRecentTasksMethod = manager.getClass().getMethod("getRecentTasks", int.class, int.class, int.class);
+            } catch (NoSuchMethodException e) {
+                // Fall back to older API
+                getRecentTasksMethod = manager.getClass().getMethod("getRecentTasks", int.class, int.class);
+            }
+        }
+        return getRecentTasksMethod;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<android.app.ActivityManager.RecentTaskInfo> getRecentTasks(int maxNum, int flags) {
+        try {
+            Method method = getGetRecentTasksMethod();
+            Object result;
+            if (method.getParameterCount() == 3) {
+                // Newer API with userId parameter
+                result = method.invoke(manager, maxNum, flags, FakeContext.ROOT_UID);
+            } else {
+                // Older API without userId parameter
+                result = method.invoke(manager, maxNum, flags);
+            }
+            
+            // Handle ParceledListSlice
+            if (result != null) {
+                Class<?> parceledListSliceClass = Class.forName("android.content.pm.ParceledListSlice");
+                if (parceledListSliceClass.isInstance(result)) {
+                    Method getListMethod = parceledListSliceClass.getMethod("getList");
+                    return (List<android.app.ActivityManager.RecentTaskInfo>) getListMethod.invoke(result);
+                }
+            }
+            return null;
+        } catch (ReflectiveOperationException e) {
+            Ln.e("Could not get recent tasks", e);
+            return null;
         }
     }
 }

@@ -226,6 +226,7 @@ export class AdbManager {
         store.apps = json.packageInfos;
         break;
       case "openapps":
+        console.log(json);
         state.openApps = json.data;
         break;
       case "createDisplay":
@@ -266,6 +267,8 @@ export class AdbManager {
     }) as any);
 
     setTimeout(() => this.sendCommand({ req: "apps" }), 3000);
+    setInterval(() => this.sendCommand({ req: "openapps" }), 1000);
+    debug.sendCommand = this.sendCommand.bind(this);
   }
 
   static async connect() {
