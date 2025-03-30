@@ -311,7 +311,7 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 			label: "Screen",
 			icon: iconSmartphoneOutline,
 			sicon: iconSmartphone,
-			cond: x => x === "scrcpy",
+			cond: x => x === "scrcpy" && !state.scrcpy.$.showx11,
 			click: () => this.shown = "scrcpy"
 		},
 		{
