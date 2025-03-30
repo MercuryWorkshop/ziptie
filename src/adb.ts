@@ -26,11 +26,6 @@ export async function connect(device: AdbDaemonWebUsbDevice) {
   try {
     return await device.connect();
   } catch (error) {
-    if (error instanceof AdbDaemonWebUsbDevice.DeviceBusyError) {
-      alert(
-        "The device is already in use by another program. Please close the program and try again.",
-      );
-    }
     // It might also throw other errors
     throw error;
   }
@@ -268,7 +263,7 @@ export class AdbManager {
     }) as any);
 
     setTimeout(() => this.sendCommand({ req: "apps" }), 3000);
-    setInterval(() => this.sendCommand({ req: "openapps" }), 1000);
+    setInterval(() => this.sendCommand({ req: "openapps" }), 2000);
     debug.sendCommand = this.sendCommand.bind(this);
   }
 
@@ -302,6 +297,8 @@ export class AdbManager {
     let adb = new Adb(transport);
     debug.adb = adb;
     let fs = await adb.sync();
-    return new AdbManager(adb, fs);
+    let mgr = new AdbManager(adb, fs);
+    debug.mgr = mgr;
+    return mgr;
   }
 }

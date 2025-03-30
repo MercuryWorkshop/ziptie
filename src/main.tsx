@@ -32,12 +32,14 @@ export const state = $state({
 	openApps: [] as { packageName: string, id: number, persistentId: number }[],
 	showLauncher: false,
 	showx11: false,
+	activeApp: null as string | null,
 
 	content: null! as HTMLElement,
 
 	scrcpy: null! as ComponentElement<typeof Scrcpy>,
 	terminal: <Terminal />,
 });
+debug.state = state;
 export const store = $store({
 	apps: [] as NativeApp[],
 }, {
@@ -50,7 +52,6 @@ async function connect(opts: SetupOpts) {
 	try {
 		mgr = await AdbManager.connect();
 	} catch (error) {
-		alert(error);
 		throw error;
 	}
 
@@ -61,8 +62,8 @@ async function connect(opts: SetupOpts) {
 
 	state.connected = true;
 	state.scrcpy = <Scrcpy client={mgr.scrcpy!} />;
-	state.terminal.$.start();
-	state.scrcpy.$.showx11 = false;
+	state.terminal.$.start("sh");
+	state.showx11 = false;
 
 	if (opts.disablecharge) {
 		let setcharge = await mgr.adb.subprocess.spawnAndWait("dumpsys battery unplug");
@@ -229,6 +230,7 @@ const SetupToggle: Component<{ val: boolean, title: string }> = function() {
 const Setup: Component<{
 	"on:connect": (opts: SetupOpts) => void,
 }, {
+	error: string,
 	disableanim: boolean,
 	disablecharge: boolean,
 }> = function() {
@@ -249,13 +251,17 @@ const Setup: Component<{
 	this.disableanim = false;
 	this.disablecharge = false;
 
-	const connect = () => {
+	const connect = async () => {
 		const opts = {
 			disableanim: this.disableanim,
 			disablecharge: this.disablecharge,
 		};
-
-		this["on:connect"](opts);
+		this.error = "";
+		try {
+			await this["on:connect"](opts);
+		} catch (error) {
+			this.error = error instanceof Error ? error.message : "Unknown error";
+		}
 	}
 
 	return (
@@ -274,6 +280,8 @@ const Setup: Component<{
 			<Button type="filled" iconType="left" on:click={connect}>
 				<Icon icon={iconPhonelinkSetup} />Connect
 			</Button>
+			{use(this.error, x => x && <div class="m3-font-body-medium">{x}</div>)}
+
 		</div>
 	)
 }
@@ -364,6 +372,20 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 				}
 			}
 		}
+		.active {
+			transform: scale(1.05);
+		}
+		.active::after {
+			content: "";
+			position: absolute;
+			width: 90%;
+			height: 4px;
+			bottom: -6px;
+			left: 50%;
+			transform: translateX(-50%);
+			background-color: #fff;
+			border-radius: 1em;
+		}
 
 		div > div {
 			height: 100%;
@@ -371,16 +393,16 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 	`;
 
 	const routes: TabRoute[] = [
-		{
-			label: "Screen",
-			icon: iconSmartphoneOutline,
-			sicon: iconSmartphone,
-			cond: x => x === "scrcpy" && !state.showx11,
-			click: () => {
-				state.showx11 = false;
-				this.shown = "scrcpy";
-			}
-		},
+		// {
+		// 	label: "Screen",
+		// 	icon: iconSmartphoneOutline,
+		// 	sicon: iconSmartphone,
+		// 	cond: x => x === "scrcpy" && !state.showx11,
+		// 	click: () => {
+		// 		state.showx11 = false;
+		// 		this.shown = "scrcpy";
+		// 	}
+		// },
 		{
 			label: "X11",
 			icon: iconMonitorOutline,
@@ -434,13 +456,16 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 				))}
 			</div>
 			<div class="appdrawer">
-				{use(state.openApps, x => x.slice(0, 9).map(x => (
-					<button on:click={() => {
-						state.showx11 = false;
-						state.showLauncher = false;
-						this.shown = "scrcpy";
-						mgr.openApp(x.packageName);
-					}}>
+				{use(state.openApps, x => x.slice(0, 9).filter(x => x.packageName !== "com.termux.x11").map(x => (
+					<button
+						class:active={use(this.shown, y => y === "scrcpy" && state.activeApp === x.packageName)}
+						on:click={() => {
+							state.showx11 = false;
+							state.showLauncher = false;
+							this.shown = "scrcpy";
+							mgr.openApp(x.packageName);
+							state.activeApp = x.packageName;
+						}}>
 						<img src={store.apps.find(y => y.packageName === x.packageName)?.icon} />
 					</button>
 				)))}
@@ -497,6 +522,15 @@ const Main: Component<{}, {
 			visibility: visible;
 		}
 
+		#scrcpy-container {
+			visibility: hidden;
+			position: absolute;
+			top: 0;
+			left: 0;
+		}
+		#scrcpy-container.visible {
+			visibility: visible;
+		}
 	`;
 
 	let launcher = <Launcher launch={(name: string) => {
@@ -504,6 +538,7 @@ const Main: Component<{}, {
 		mgr.openApp(name);
 		state.showx11 = false;
 		state.showLauncher = false;
+		state.activeApp = name;
 	}} />
 	this.shown = "settings";
 
@@ -555,13 +590,16 @@ const Main: Component<{}, {
 			<Nav bind:shown={use(this.shown)} />
 			<div class="content" bind:this={use(this.content)}>
 				<iframe id="codeframe" bind:this={use(this.codeframe)} class:visible={use(this.shown, x => x === "code")}/>
+				<div id="scrcpy-container" class:visible={use(this.shown, x => x === "scrcpy")}>
+					{use(state.scrcpy)}
+				</div>
 				{use(this.shown, (x: Tabs) => {
 					if (x !== "scrcpy" && state.scrcpy) {
 						state.showx11 = false;
 					}
 
 					if (x === "scrcpy") {
-						return state.scrcpy;
+						// ...
 					} else if (x === "terminal") {
 						return state.terminal;
 					} else if (x === "code") {
@@ -578,11 +616,11 @@ const Main: Component<{}, {
 const App: Component<{}, {
 	shown: HTMLElement,
 }> = function() {
+	let main = <Main />;
 	this.shown = <Setup on:connect={async (opts) => {
-		this.shown = <Main />;
 		await connect(opts);
+		this.shown = main;
 	}} />
-	//this.shown = <Main />;
 
 	return (
 		<div id="app">

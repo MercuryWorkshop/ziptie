@@ -17,7 +17,7 @@ import {
 	ScrcpyControlMessageWriter
 } from "@yume-chan/scrcpy";
 import { OpusStream } from "./audio";
-import { mgr } from "./main";
+import { mgr, state } from "./main";
 
 function createVideoFrameRenderer(): {
 	renderer: VideoFrameRenderer;
@@ -41,9 +41,7 @@ export const Scrcpy: Component<{
 	client: AdbScrcpyClient,
 }, {
 	expanded: boolean,
-}, {
-	showx11: boolean,
-}> = function() {
+}, {}> = function() {
 	this.css = `
 	height: 100%;
 	width: 100%;
@@ -121,7 +119,7 @@ export const Scrcpy: Component<{
 		const injectKeyCode = (e: KeyboardEvent) => {
 			const { type, code } = e
 
-			if (this.showx11) {
+			if (state.showx11) {
 				e.preventDefault()
 				e.stopPropagation()
 
@@ -163,7 +161,7 @@ export const Scrcpy: Component<{
 			e.preventDefault()
 			e.stopPropagation()
 
-			if (this.showx11) {
+			if (state.showx11) {
 				mgr.writeMouseCmd([2, e.deltaX, e.deltaY, 0, 0]);
 			} else {
 				controller.injectScroll({
@@ -192,7 +190,7 @@ export const Scrcpy: Component<{
 				AndroidMotionEventButton.Forward,
 			]
 
-			if (this.showx11) {
+			if (state.showx11) {
 				let { pointerX, pointerY } = getPointer(video, clientX, clientY);
 
 				let jsButtonToX = [
