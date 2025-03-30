@@ -31,6 +31,7 @@ export const state = $state({
 	connected: false,
 	openApps: [] as string[],
 	showLauncher: false,
+	showx11: false,
 
 	content: null! as HTMLElement,
 
@@ -157,13 +158,36 @@ const Launcher: Component<{
 		}
 	`;
 
+	let textfield = <TextField
+		name="App name"
+		bind:value={use(this.searchText)}
+		display="block"
+	/>
+	let input = textfield.querySelector("input")!;
+	input.addEventListener("input", () => {
+		this.searchText = input.value;
+	});
+	input.addEventListener("keydown", (e) => {
+		if (e.key !== "Enter") return;
+		if (!this.filteredApps[0]) return;
+		this.launch(this.filteredApps[0].packageName);
+		this.searchText = "";
+		e.preventDefault();
+	});
+	textfield.addEventListener("click", (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		input.focus();
+	});
+	useChange(state.showLauncher, () => {
+		if (state.showLauncher) {
+			setTimeout(() => input.focus(), 100);
+		}
+	});
+
 	return (
 		<div>
-			<TextField
-				name="App name"
-				bind:value={use(this.searchText)}
-				display="block"
-			/>
+			{textfield}
 			<div class="grid">
 				{use(this.filteredApps, x => x.map(x => (
 					<CardClickable type="filled" on:click={() => {
@@ -316,18 +340,18 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 			label: "Screen",
 			icon: iconSmartphoneOutline,
 			sicon: iconSmartphone,
-			cond: x => x === "scrcpy" && !state.scrcpy.$.showx11,
+			cond: x => x === "scrcpy" && !state.showx11,
 			click: () => this.shown = "scrcpy"
 		},
 		{
 			label: "X11",
 			icon: iconMonitorOutline,
 			sicon: iconMonitor,
-			cond: x => x === "scrcpy" && state.scrcpy.$.showx11,
+			cond: x => x === "scrcpy" && state.showx11,
 			click: () => {
 				mgr.openApp("com.termux.x11");
 				this.shown = "scrcpy";
-				state.scrcpy.$.showx11 = true;
+				state.showx11 = true;
 			}
 		},
 		{
@@ -416,7 +440,7 @@ const Main: Component<{}, {
 	let launcher = <Launcher launch={(name: string) => {
 		this.shown = "scrcpy";
 		mgr.openApp(name);
-		state.scrcpy.$.showx11 = false;
+		state.showx11 = false;
 		state.showLauncher = false;
 	}} />
 	this.shown = "settings";
@@ -424,6 +448,26 @@ const Main: Component<{}, {
 	this.mount = () => {
 		state.content = this.content;
 	}
+
+	document.addEventListener("keydown", (e) => {
+		if (e.key === "Escape") {
+			state.showLauncher = false;
+			e.preventDefault();
+		}
+		if (e.key === "Backspace") {
+			if (e.target === document.activeElement) {
+				// prevent closing the tab accidentally
+				e.preventDefault();
+			}
+		}
+		if (e.key === "Meta" && !state.showx11) {
+			state.showLauncher = true;
+			e.preventDefault();
+			e.stopPropagation();
+		}
+	}, {
+		capture: true,
+	});
 
 	return (
 		<div>
@@ -442,7 +486,7 @@ const Main: Component<{}, {
 			<div class="content" bind:this={use(this.content)}>
 				{use(this.shown, (x: Tabs) => {
 					if (x !== "scrcpy" && state.scrcpy) {
-						state.scrcpy.$.showx11 = false;
+						state.showx11 = false;
 					}
 
 					if (x === "scrcpy") {
