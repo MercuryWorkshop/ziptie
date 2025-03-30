@@ -57,7 +57,6 @@ class Connection(private val client: LocalSocket) : Thread() {
         val bb = ByteBuffer.allocate(4 + resbytes.size)
         bb.putInt(resbytes.size)
         bb.put(resbytes)
-        Log.i(TAG, "Sending response of len: ${resbytes.size}")
         client.outputStream.write(bb.array())
     }
 
@@ -150,7 +149,6 @@ class Connection(private val client: LocalSocket) : Thread() {
             try {
 
                 val request = readJsonFromInputStream(client.inputStream) ?: continue
-                Log.i(TAG, "Received reque>st: $request")
 
                 send(
                         when (request["req"]) {

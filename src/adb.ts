@@ -195,6 +195,9 @@ export class AdbManager {
     logProcess(e);
     return await e.exit;
   }
+  async termuxShell(cmd: string): Promise<AdbSubprocessProtocol> {
+    return await this.adb.subprocess.shell(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
+  }
 
   async writeMouseCmd(bytes: number[]) {
     if (!this.mouseWriter) throw new Error("mouse writer not open");
@@ -220,13 +223,11 @@ export class AdbManager {
   }
 
   async parseResponse(json: any) {
-    console.log("parseResponse", json);
     switch (json.req) {
       case "apps":
         store.apps = json.packageInfos;
         break;
       case "openapps":
-        console.log(json);
         state.openApps = json.data;
         break;
       case "createDisplay":
