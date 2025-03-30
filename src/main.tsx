@@ -391,6 +391,7 @@ const Main: Component<{}, {
 
 		.content {
 			flex: 1;
+			min-width: 0;
 		}
 
 		dialog:has(.Dialog-m3-container) {

@@ -27,3 +27,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+/release-0.0.0.apk
+/server/ziptie.dex
