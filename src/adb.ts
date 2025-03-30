@@ -10,7 +10,7 @@ import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcp
 import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
 import { MaybeConsumable, pipeFrom, PushReadableStream, ReadableStream, StructDeserializeStream, WrapReadableStream, WrapWritableStream } from '@yume-chan/stream-extra';
 import { Logcat, AndroidLogEntry } from '@yume-chan/android-bin';
-import { debug, mgr, state } from './main';
+import { debug, mgr, state, store } from './main';
 
 export enum VirtualDisplayMode {
   None,
@@ -223,7 +223,7 @@ export class AdbManager {
     console.log("parseResponse", json);
     switch (json.req) {
       case "apps":
-        state.apps = json.packageInfos;
+        store.apps = json.packageInfos;
         break;
       case "openapps":
         state.openApps = json.data;

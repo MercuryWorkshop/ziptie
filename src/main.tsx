@@ -29,7 +29,6 @@ export const debug: any = {};
 export let mgr: AdbManager;
 export const state = $state({
 	connected: false,
-	apps: [] as NativeApp[],
 	openApps: [] as string[],
 	showLauncher: false,
 
@@ -37,6 +36,13 @@ export const state = $state({
 
 	scrcpy: null! as ComponentElement<typeof Scrcpy>,
 	terminal: <Terminal />,
+});
+export const store = $store({
+	apps: [] as NativeApp[],
+}, {
+	ident: "ziptie",
+	backing: "localstorage",
+	autosave: "auto"
 });
 
 async function connect(opts: SetupOpts) {
@@ -128,9 +134,9 @@ const Launcher: Component<{
 }> = function() {
 	this.searchText = "";
 
-	useChange([state.apps, this.searchText], () => {
-		console.log(state.apps);
-		this.filteredApps = Object.values(state.apps)
+	useChange([store.apps, this.searchText], () => {
+		console.log(store.apps);
+		this.filteredApps = store.apps
 			.filter(app => app.packageName.toLowerCase().includes(this.searchText.toLowerCase()))
 	});
 
