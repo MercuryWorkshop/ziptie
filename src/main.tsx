@@ -152,6 +152,11 @@ const Launcher: Component<{
 		flex-direction: column;
 		gap: 1em;
 
+		.grid-wrapper {
+			overflow-y: scroll;
+			height: 50vh;
+		}
+
 		.grid {
 			display: grid;
 			grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
@@ -161,6 +166,7 @@ const Launcher: Component<{
 		.CardClickable-m3-container {
 			width: 100%;
 			height: 100%;
+			align-items: center;
 			justify-content: center;
 		}
 	`;
@@ -195,15 +201,17 @@ const Launcher: Component<{
 	return (
 		<div>
 			{textfield}
-			<div class="grid">
-				{use(this.filteredApps, x => x.map(x => (
-					<CardClickable type="filled" on:click={() => {
-						this.launch(x.packageName);
-						this.searchText = "";
-					}}>
-						<NativeAppView app={x} />
-					</CardClickable>
-				)))}
+			<div class="grid-wrapper">
+				<div class="grid">
+					{use(this.filteredApps, x => x.map(x => (
+						<CardClickable type="filled" on:click={() => {
+							this.launch(x.packageName);
+							this.searchText = "";
+						}}>
+							<NativeAppView app={x} />
+						</CardClickable>
+					)))}
+				</div>
 			</div>
 		</div>
 	)
