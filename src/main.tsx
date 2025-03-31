@@ -46,6 +46,7 @@ export const state = $state({
 });
 debug.state = state;
 export const store = $store({
+	websocketUrl: "",
 	apps: [] as NativeApp[],
 }, {
 	ident: "ziptie",
@@ -245,7 +246,6 @@ const Setup: Component<{
 	disableanim: boolean,
 	disablecharge: boolean,
 	installPrompt: any,
-	websocketUrl: string,
 }> = function() {
 	this.css = `
 		display: flex;
@@ -270,7 +270,6 @@ const Setup: Component<{
 	this.disableanim = false;
 	this.disablecharge = false;
 	this.installPrompt = null;
-	this.websocketUrl = "";
 
 	const handleInstall = async () => {
 		if (!this.installPrompt) return;
@@ -303,14 +302,14 @@ const Setup: Component<{
 	}
 
 	const connectWireless = async () => {
-		if (!this.websocketUrl) {
+		if (!store.websocketUrl) {
 			this.error = "Please enter a WebSocket URL";
 			return;
 		}
 		const opts = {
 			disableanim: this.disableanim,
 			disablecharge: this.disablecharge,
-			websocketUrl: this.websocketUrl,
+			websocketUrl: store.websocketUrl,
 		};
 		this.error = "";
 		try {
@@ -337,7 +336,7 @@ const Setup: Component<{
 				<div class="m3-font-title-large">Connection</div>
 				<TextField
 					name="WebSocket URL"
-					bind:value={use(this.websocketUrl)}
+					bind:value={use(store.websocketUrl)}
 					placeholder="ws://localhost:8080"
 					display="block"
 				/>
@@ -570,9 +569,9 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 					size="small"
 					icon={iconApps}
 					color="primary"
-				on:click={() => {
-					state.showLauncher = true;
-				}}
+					on:click={() => {
+						state.showLauncher = true;
+					}}
 				/>
 			</div>
 		</div>
@@ -601,6 +600,7 @@ const Main: Component<{
 			opacity: 1;
 		}
 		.content {
+			overflow: hidden;
 			flex: 1;
 			min-width: 0;
 			position: relative;
@@ -699,7 +699,7 @@ const Main: Component<{
 
 			<Nav bind:shown={use(this.shown)} />
 			<div class="content" bind:this={use(this.content)}>
-				<iframe id="codeframe" bind:this={use(this.codeframe)} class:visible={use(this.shown, x => x === "code")}/>
+				<iframe id="codeframe" bind:this={use(this.codeframe)} class:visible={use(this.shown, x => x === "code")} />
 				<div id="scrcpy-container" class:visible={use(this.shown, x => x === "scrcpy")}>
 					{use(state.scrcpy)}
 				</div>

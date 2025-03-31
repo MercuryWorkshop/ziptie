@@ -69,7 +69,7 @@ let tmpdir = "/data/local/tmp";
 export class AdbManager {
   jarWriter: WritableStreamDefaultWriter<MaybeConsumable<Uint8Array>> | undefined;
   mouseWriter: WritableStreamDefaultWriter<Uint8Array> | undefined;
-  
+
   displayId: number = 0
   density: number = 150
   scrcpy: AdbScrcpyClient | undefined
@@ -165,24 +165,24 @@ export class AdbManager {
   }
 
   async startX11() {
-      await this.fs.write({
-        filename: tmpdir + "/zipmouse.c",
-        file: mkstream(zipmouse)
-      })
-      await this.fs.write({
-        filename: tmpdir + "/zipstart.sh",
-        file: mkstream(zipstart)
-      });
-      await this.termuxCmd(`rm pipe; mkfifo pipe; sleep 2`);
-      this.termuxCmd(`bash ${tmpdir}/zipstart.sh`);
-      await this.termuxCmd(`sleep 1; cat pipe`);
-      console.log("exited?");
+    await this.fs.write({
+      filename: tmpdir + "/zipmouse.c",
+      file: mkstream(zipmouse)
+    })
+    await this.fs.write({
+      filename: tmpdir + "/zipstart.sh",
+      file: mkstream(zipstart)
+    });
+    await this.termuxCmd(`rm pipe; mkfifo pipe; sleep 2`);
+    this.termuxCmd(`bash ${tmpdir}/zipstart.sh`);
+    await this.termuxCmd(`sleep 1; cat pipe`);
+    console.log("exited?");
 
-      let socket = await this.adb.createSocket("tcp:12345");
-      this.mouseWriter = socket.writable.getWriter() as any;
+    let socket = await this.adb.createSocket("tcp:12345");
+    this.mouseWriter = socket.writable.getWriter() as any;
 
-      // GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0
-      this.termuxCmd("proot-distro login debian --shared-tmp -- PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
+    // GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0
+    this.termuxCmd("proot-distro login debian --shared-tmp -- PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
   }
 
   async termuxCmd(cmd: string): Promise<number> {
@@ -237,7 +237,7 @@ export class AdbManager {
     const logcat = new Logcat(this.adb);
     logcat.binary().pipeTo(new WritableStream({
       write(packet) {
-        
+
         // if (packet.message.includes("Start server") || packet.tag.includes("Ziptie") || packet.tag.includes("scrcpy"))
         //   console.log(packet.message);
       }
@@ -277,7 +277,7 @@ export class AdbManager {
       }
     }) as any);
 
-    // setTimeout(() => this.sendCommand({ req: "apps" }), 3000);
+    setTimeout(() => this.sendCommand({ req: "apps" }), 3000);
     setInterval(() => this.sendCommand({ req: "openapps" }), 2000);
     debug.sendCommand = this.sendCommand.bind(this);
   }
