@@ -1,16 +1,15 @@
-import { Adb, AdbDaemonDevice, AdbDaemonTransport, AdbPacket, AdbPacketSerializeStream, AdbServerClient, AdbServerTransport, AdbSubprocessNoneProtocol, AdbSubprocessProtocol, AdbSubprocessShellProtocol, AdbSubprocessWaitResult, AdbSync } from '@yume-chan/adb';
+import { Adb, AdbDaemonDevice, AdbDaemonTransport, AdbSubprocessProtocol, AdbSync } from '@yume-chan/adb';
 
 import { AdbDaemonWebUsbDevice, AdbDaemonWebUsbDeviceManager } from "@yume-chan/adb-daemon-webusb";
-import { AdbScrcpyClient, AdbScrcpyExitedError, AdbScrcpyOptions2_1 } from '@yume-chan/adb-scrcpy';
-import { ScrcpyOptions3_1, DefaultServerPath, AndroidKeyCode, AndroidMotionEventAction, AndroidMotionEventButton, ScrcpyAudioCodec } from "@yume-chan/scrcpy";
+import { AdbScrcpyClient, AdbScrcpyOptions2_1 } from '@yume-chan/adb-scrcpy';
+import { ScrcpyOptions3_1, DefaultServerPath } from "@yume-chan/scrcpy";
 import AdbWebCredentialStore from "@yume-chan/adb-credential-web";
-import { BIN, VERSION } from "@yume-chan/fetch-scrcpy-server";
-import { AndroidKeyEventAction, ScrcpyMediaStreamPacket } from "@yume-chan/scrcpy";
+import { BIN } from "@yume-chan/fetch-scrcpy-server";
 
-import { CodecOptions, Crop } from '@yume-chan/scrcpy/esm/1_17/impl';
-import { MaybeConsumable, pipeFrom, PushReadableStream, ReadableStream, StructDeserializeStream, WrapReadableStream, WrapWritableStream } from '@yume-chan/stream-extra';
-import { Logcat, AndroidLogEntry } from '@yume-chan/android-bin';
-import { debug, mgr, state, store } from './main';
+import { CodecOptions } from '@yume-chan/scrcpy/esm/1_17/impl';
+import { MaybeConsumable } from '@yume-chan/stream-extra';
+import { Logcat } from '@yume-chan/android-bin';
+import { debug, state, store } from './main';
 
 export enum VirtualDisplayMode {
   None,
@@ -19,7 +18,7 @@ export enum VirtualDisplayMode {
 }
 export const VIRTUAL_DISPLAY_MODE: VirtualDisplayMode = VirtualDisplayMode.Internal;
 
-
+// @ts-ignore
 const Manager: AdbDaemonWebUsbDeviceManager = new AdbDaemonWebUsbDeviceManager(navigator.usb);
 
 export async function connect(device: AdbDaemonWebUsbDevice) {
@@ -63,6 +62,7 @@ export function logProcess(process: AdbSubprocessProtocol) {
 
 import zipmouse from "../zipmouse.c?raw"
 import zipstart from "../zipstart.sh?raw"
+// @ts-ignore
 import server from "../release-0.0.0.apk?arraybuffer"
 import { createFramer, mkstream } from './util';
 let tmpdir = "/data/local/tmp";

@@ -1,17 +1,14 @@
 import "dreamland";
 
-import { AdbScrcpyClient } from '@yume-chan/adb-scrcpy';
-import { AdbManager, gDisplayId, logProcess, prootCmd, startScrcpy, termuxCmd, termuxShell } from './adb';
+import { AdbManager } from './adb';
 import './style.css'
-import { AndroidKeyCode, AndroidKeyEventAction } from '@yume-chan/scrcpy';
 import { Scrcpy } from './scrcpy';
-import { AdbSocket } from '@yume-chan/adb';
 import { Terminal } from './Terminal';
 import { proxyInitLibcurl, proxyLoadPage } from './proxy';
 import { AdbDaemonWebsocketDevice } from './WebSocketDevice';
 
 import type { IconifyIcon } from "@iconify/types";
-import { Button, Card, CardClickable, Dialog, FAB, Icon, NavList, NavListButton, StyleFromParams, Switch, TextField } from 'm3-dreamland';
+import { Button, Card, CardClickable, Dialog, FAB, Icon, NavListButton, StyleFromParams, Switch, TextField } from 'm3-dreamland';
 
 import iconPhonelinkSetup from "@ktibow/iconset-material-symbols/phonelink-setup";
 import iconPhonelinkSetupOutline from "@ktibow/iconset-material-symbols/phonelink-setup-outline";
@@ -20,8 +17,6 @@ import iconCodeBlocksOutline from "@ktibow/iconset-material-symbols/code-blocks-
 import iconMonitor from "@ktibow/iconset-material-symbols/monitor";
 import iconMonitorOutline from "@ktibow/iconset-material-symbols/monitor-outline";
 import iconTerminal from "@ktibow/iconset-material-symbols/terminal";
-import iconSmartphone from "@ktibow/iconset-material-symbols/smartphone";
-import iconSmartphoneOutline from "@ktibow/iconset-material-symbols/smartphone-outline";
 
 import iconApps from "@ktibow/iconset-material-symbols/apps";
 

@@ -1,5 +1,3 @@
-import { MaybeConsumable } from "@yume-chan/stream-extra";
-
 export function mkstream(text: string | Uint8Array): any {
   let uint8array = text instanceof Uint8Array ? text : new TextEncoder().encode(text);
   return new ReadableStream({
