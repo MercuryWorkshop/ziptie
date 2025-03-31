@@ -26,12 +26,13 @@ class Server {
     fun start(args: Array<String>) {
         Log.i(TAG, "Start server")
 
-        val outy = PrintStream(FileOutputStream("/proc/self/fd/1"))
-        outy.println("Hello, stdout via fd!")
-        outy.close()
-
         val server = LocalServerSocket("ziptie")
         Log.i(TAG, "Server started, listening on ${server.localSocketAddress}")
+
+        val outy = PrintStream(FileOutputStream("/proc/self/fd/1"))
+        outy.println("[START]")
+        outy.close()
+
 
         while (true) {
             val conn = Connection(server.accept())

@@ -182,7 +182,7 @@ export class AdbManager {
       this.mouseWriter = socket.writable.getWriter() as any;
 
       // GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0
-      await this.termuxCmd("proot-distro login debian --shared-tmp -- PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
+      this.termuxCmd("proot-distro login debian --shared-tmp -- PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
   }
 
   async termuxCmd(cmd: string): Promise<number> {
@@ -237,8 +237,9 @@ export class AdbManager {
     const logcat = new Logcat(this.adb);
     logcat.binary().pipeTo(new WritableStream({
       write(packet) {
-        if (packet.message.includes("Start server") || packet.tag.includes("Ziptie") || packet.tag.includes("scrcpy"))
-          console.log(packet.message);
+        
+        // if (packet.message.includes("Start server") || packet.tag.includes("Ziptie") || packet.tag.includes("scrcpy"))
+        //   console.log(packet.message);
       }
     }) as any);
   }
@@ -248,9 +249,23 @@ export class AdbManager {
       filename: tmpdir + "/server.apk",
       file: mkstream(server)
     });
-    let e = await this.adb.subprocess.shell(["sh", "-c", `echo "if i remove this echo it breaks" && CLASSPATH=${tmpdir}/server.apk app_process /system/bin org.mercuryworkshop.ziptie.Server`]);
-    logProcess(e);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    let e = await this.adb.subprocess.shell(["sh", "-c", `true && CLASSPATH=${tmpdir}/server.apk app_process /system/bin org.mercuryworkshop.ziptie.Server`]);
+    let resolvelaunched: ((_: unknown) => void) | undefined;
+    e.stdout.pipeTo(new WritableStream({
+      write(packet) {
+        let msg = new TextDecoder().decode(packet)
+        console.log(msg);
+        if (msg.includes("[START]")) {
+          resolvelaunched!(undefined);
+        }
+      }
+    }) as any);
+    e.stderr.pipeTo(new WritableStream({
+      write(packet) {
+        console.error(new TextDecoder().decode(packet));
+      }
+    }) as any);
+    await new Promise(resolve => resolvelaunched = resolve);
     let socket = await this.adb.createSocket("localabstract:ziptie");
     this.jarWriter = socket.writable.getWriter();
     let td = new TextDecoder();
@@ -262,29 +277,28 @@ export class AdbManager {
       }
     }) as any);
 
-    setTimeout(() => this.sendCommand({ req: "apps" }), 3000);
+    // setTimeout(() => this.sendCommand({ req: "apps" }), 3000);
     setInterval(() => this.sendCommand({ req: "openapps" }), 2000);
     debug.sendCommand = this.sendCommand.bind(this);
   }
 
-  static async connect() {
-    Manager.trackDevices();
-
-    let devices = await Manager.getDevices();
-    let device: AdbDaemonWebUsbDevice | undefined;
-    if (devices.length == 1) {
-      device = devices[0];
-    } else {
-      device = await Manager.requestDevice();
-      if (!device) {
-        throw new Error("No device selected");
+  static async connect(device?: AdbDaemonDevice) {
+    if (!device) {
+      Manager.trackDevices();
+      let devices = await Manager.getDevices();
+      let selectedDevice: AdbDaemonWebUsbDevice | undefined;
+      if (devices.length == 1) {
+        selectedDevice = devices[0];
+      } else {
+        selectedDevice = await Manager.requestDevice();
+        if (!selectedDevice) {
+          throw new Error("No device selected");
+        }
       }
+      device = selectedDevice;
     }
-    let connection = await connect(device);
 
-    // const device = new AdbDaemonWebsocketDevice("ws://10.0.1.163:8080");
-    // let connection = await device.connect();
-
+    let connection = await device.connect();
     console.log("connected");
 
     const CredentialStore: AdbWebCredentialStore = new AdbWebCredentialStore("skibidi");

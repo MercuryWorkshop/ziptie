@@ -3,7 +3,7 @@ import { MaybeConsumable, pipeFrom, ReadableStream, StructDeserializeStream, Wra
 
 declare const WebSocketStream: any;
 
-class AdbDaemonWebsocketDevice implements AdbDaemonDevice {
+export class AdbDaemonWebsocketDevice implements AdbDaemonDevice {
   static isSupported(): boolean {
     return true;
   }

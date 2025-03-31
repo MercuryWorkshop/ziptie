@@ -8,6 +8,7 @@ import { Scrcpy } from './scrcpy';
 import { AdbSocket } from '@yume-chan/adb';
 import { Terminal } from './Terminal';
 import { proxyInitLibcurl, proxyLoadPage } from './proxy';
+import { AdbDaemonWebsocketDevice } from './WebSocketDevice';
 
 import type { IconifyIcon } from "@iconify/types";
 import { Button, Card, CardClickable, Dialog, FAB, Icon, NavList, NavListButton, StyleFromParams, Switch, TextField } from 'm3-dreamland';
@@ -39,6 +40,9 @@ export const state = $state({
 
 	scrcpy: null! as ComponentElement<typeof Scrcpy>,
 	terminal: <Terminal />,
+	x11started: false,
+	showSetup: true,
+	codeserverstarted: false,
 });
 debug.state = state;
 export const store = $store({
@@ -51,7 +55,12 @@ export const store = $store({
 
 async function connect(opts: SetupOpts) {
 	try {
-		mgr = await AdbManager.connect();
+		if (opts.websocketUrl) {
+			const device = new AdbDaemonWebsocketDevice(opts.websocketUrl);
+			mgr = await AdbManager.connect(device);
+		} else {
+			mgr = await AdbManager.connect();
+		}
 	} catch (error) {
 		throw error;
 	}
@@ -207,6 +216,7 @@ const Launcher: Component<{
 type SetupOpts = {
 	disableanim: boolean,
 	disablecharge: boolean,
+	websocketUrl?: string,
 };
 
 const SetupToggle: Component<{ val: boolean, title: string }> = function() {
@@ -235,6 +245,7 @@ const Setup: Component<{
 	disableanim: boolean,
 	disablecharge: boolean,
 	installPrompt: any,
+	websocketUrl: string,
 }> = function() {
 	this.css = `
 		display: flex;
@@ -248,11 +259,18 @@ const Setup: Component<{
 			flex-direction: column;
 			gap: 1em;
 		}
+
+		.connection-options {
+			display: flex;
+			flex-direction: column;
+			gap: 1em;
+		}
 	`;
 
 	this.disableanim = false;
 	this.disablecharge = false;
 	this.installPrompt = null;
+	this.websocketUrl = "";
 
 	const handleInstall = async () => {
 		if (!this.installPrompt) return;
@@ -284,6 +302,24 @@ const Setup: Component<{
 		}
 	}
 
+	const connectWireless = async () => {
+		if (!this.websocketUrl) {
+			this.error = "Please enter a WebSocket URL";
+			return;
+		}
+		const opts = {
+			disableanim: this.disableanim,
+			disablecharge: this.disablecharge,
+			websocketUrl: this.websocketUrl,
+		};
+		this.error = "";
+		try {
+			await this["on:connect"](opts);
+		} catch (error) {
+			this.error = error instanceof Error ? error.message : "Unknown error";
+		}
+	}
+
 	return (
 		<div>
 			<div class="m3-font-headline-medium">Ziptie</div>
@@ -297,9 +333,24 @@ const Setup: Component<{
 				</div>
 			</Card>
 
-			<Button type="filled" iconType="left" on:click={connect}>
-				<Icon icon={iconPhonelinkSetup} />Connect
-			</Button>
+			<div class="connection-options">
+				<div class="m3-font-title-large">Connection</div>
+				<TextField
+					name="WebSocket URL"
+					bind:value={use(this.websocketUrl)}
+					placeholder="ws://localhost:8080"
+					display="block"
+				/>
+				<div style="display: flex; gap: 1em;">
+					<Button type="filled" iconType="left" on:click={connect}>
+						<Icon icon={iconPhonelinkSetup} />Connect via USB
+					</Button>
+					<Button type="filled" iconType="left" on:click={connectWireless}>
+						<Icon icon={iconPhonelinkSetup} />Connect Wirelessly
+					</Button>
+				</div>
+			</div>
+
 			{use(this.error, x => x && <div class="m3-font-body-medium">{x}</div>)}
 			{use(this.installPrompt, x => x && (
 				<Button type="filled" on:click={handleInstall}>
@@ -323,7 +374,12 @@ const Settings: Component<{}, {
 		<div>
 			<div class="m3-font-headline-medium">Settings</div>
 			<SetupToggle bind:val={use(state.relativeMouse)} title="Relative mouse mode" />
-			<Button type="tonal" on:click={() => mgr.startX11()}>startx</Button>
+			<Button type="tonal" on:click={async () => {
+				if (!state.x11started) {
+					await mgr.startX11();
+					state.x11started = true;
+				}
+			}}>startx</Button>
 			<Button type="tonal" on:click={() => {
 				if (document.fullscreenElement) {
 					document.exitFullscreen();
@@ -338,6 +394,7 @@ const Settings: Component<{}, {
 type Tabs = "scrcpy" | "terminal" | "code" | "settings";
 type TabRoute = {
 	cond: (tabs: Tabs) => boolean,
+	disabled: () => boolean,
 	click: () => void,
 	label: string,
 	icon: IconifyIcon,
@@ -417,6 +474,11 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 		div > div {
 			height: 100%;
 		}
+
+		button[disabled] {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
 	`;
 
 	const routes: TabRoute[] = [
@@ -435,6 +497,7 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 			icon: iconMonitorOutline,
 			sicon: iconMonitor,
 			cond: x => x === "scrcpy" && state.showx11,
+			disabled: () => !state.x11started,
 			click: () => {
 				mgr.openApp("com.termux.x11");
 				state.showx11 = true;
@@ -446,6 +509,7 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 			icon: iconCodeBlocksOutline,
 			sicon: iconCodeBlocks,
 			cond: x => x === "code",
+			disabled: () => !state.codeserverstarted,
 			click: async () => {
 				console.log("loading page");
 				await proxyInitLibcurl();
@@ -457,6 +521,7 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 			icon: iconTerminal,
 			sicon: iconTerminal,
 			cond: x => x === "terminal",
+			disabled: () => false,
 			click: () => this.shown = "terminal",
 		},
 		{
@@ -464,6 +529,7 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 			icon: iconPhonelinkSetupOutline,
 			sicon: iconPhonelinkSetup,
 			cond: x => x === "settings",
+			disabled: () => false,
 			click: () => this.shown = "settings"
 		}
 	];
@@ -476,6 +542,9 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 						type="rail"
 						icon={use(this.shown, y => x.cond(y) ? x.sicon : x.icon)}
 						selected={use(this.shown, y => x.cond(y))}
+						extraOptions={{
+							disabled: use(state.x11started, x.disabled)
+						}}
 						on:click={x.click}
 					>
 						{x.label}
@@ -598,7 +667,7 @@ const Main: Component<{
 				e.preventDefault();
 			}
 		}
-		if (e.key === "Meta" && !state.showx11) {
+		if (e.key === "Meta" && !state.showx11 && !state.showSetup) {
 			state.showLauncher = !state.showLauncher;
 			e.preventDefault();
 			e.stopPropagation();
@@ -655,19 +724,18 @@ const Main: Component<{
 }
 
 const App: Component<{}, {
-	showSetup: boolean,
 }> = function() {
-	this.showSetup = true;
-	let main = <Main show={use(this.showSetup, x => !x)} />;
+	state.showSetup = true;
+	let main = <Main show={use(state.showSetup, x => !x)} />;
 	let setup = <Setup on:connect={async (opts) => {
 		await connect(opts);
-		this.showSetup = false;
+		state.showSetup = false;
 	}} />
 
 	return (
 		<div id="app">
 			<StyleFromParams scheme="vibrant" contrast={0} color="CBA6F7" />
-			{use(this.showSetup, x => x ? setup : "")}
+			{use(state.showSetup, x => x ? setup : "")}
 			{main}
 		</div>
 	)
