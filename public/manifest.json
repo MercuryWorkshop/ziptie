@@ -1,0 +1,22 @@
+{
+  "name": "Ziptie",
+  "short_name": "Ziptie",
+  "description": "Connect your Android device to your Chromebook",
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay"],  
+  "background_color": "#000000",
+  "theme_color": "#CBA6F7",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+} 

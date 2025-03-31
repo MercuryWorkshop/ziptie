@@ -233,6 +233,7 @@ const Setup: Component<{
 	error: string,
 	disableanim: boolean,
 	disablecharge: boolean,
+	installPrompt: any,
 }> = function() {
 	this.css = `
 		display: flex;
@@ -250,6 +251,24 @@ const Setup: Component<{
 
 	this.disableanim = false;
 	this.disablecharge = false;
+	this.installPrompt = null;
+
+	const handleInstall = async () => {
+		if (!this.installPrompt) return;
+		this.installPrompt.prompt();
+		const { outcome } = await this.installPrompt.userChoice;
+		if (outcome === 'accepted') {
+			console.log('User accepted the install prompt');
+		}
+		this.installPrompt = null;
+	};
+
+	this.mount = () => {
+		window.addEventListener('beforeinstallprompt', (e) => {
+			e.preventDefault();
+			this.installPrompt = e;
+		});
+	};
 
 	const connect = async () => {
 		const opts = {
@@ -281,7 +300,11 @@ const Setup: Component<{
 				<Icon icon={iconPhonelinkSetup} />Connect
 			</Button>
 			{use(this.error, x => x && <div class="m3-font-body-medium">{x}</div>)}
-
+			{use(this.installPrompt, x => x && (
+				<Button type="filled" on:click={handleInstall}>
+					Install App
+				</Button>
+			))}
 		</div>
 	)
 }

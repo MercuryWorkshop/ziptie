@@ -1,0 +1,17 @@
+{
+  "name": "Ziptie",
+  "short_name": "Ziptie",
+  "description": "Ziptie your android to your chromebook",
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay"],
+  "background_color": "#242424",
+  "theme_color": "#CBA6F7",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+} 
