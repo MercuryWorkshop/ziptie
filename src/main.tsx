@@ -510,13 +510,27 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 	)
 }
 
-const Main: Component<{}, {
+const Main: Component<{
+	show: boolean,
+}, {
 	shown: Tabs,
 	codeframe: HTMLIFrameElement,
 	content: HTMLElement,
 }> = function() {
 	this.css = `
 		display: flex;
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		visibility: hidden;
+		opacity: 0;
+		transition: visibility 0.2s ease-in-out, opacity 0.2s ease-in-out;
+		&.visible {
+			visibility: visible;
+			opacity: 1;
+		}
 		.content {
 			flex: 1;
 			min-width: 0;
@@ -602,7 +616,7 @@ const Main: Component<{}, {
 	});
 
 	return (
-		<div>
+		<div class:visible={use(this.show)}>
 			<Dialog
 				headline="Apps"
 				bind:open={use(state.showLauncher)}
@@ -641,18 +655,20 @@ const Main: Component<{}, {
 }
 
 const App: Component<{}, {
-	shown: HTMLElement,
+	showSetup: boolean,
 }> = function() {
-	let main = <Main />;
-	this.shown = <Setup on:connect={async (opts) => {
+	this.showSetup = true;
+	let main = <Main show={use(this.showSetup, x => !x)} />;
+	let setup = <Setup on:connect={async (opts) => {
 		await connect(opts);
-		this.shown = main;
+		this.showSetup = false;
 	}} />
 
 	return (
 		<div id="app">
 			<StyleFromParams scheme="vibrant" contrast={0} color="CBA6F7" />
-			{use(this.shown)}
+			{use(this.showSetup, x => x ? setup : "")}
+			{main}
 		</div>
 	)
 }

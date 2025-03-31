@@ -13,6 +13,8 @@ import android.os.Build
 import android.util.Base64
 import android.util.DisplayMetrics
 import android.util.Log
+import android.view.Surface
+import android.view.SurfaceControl
 import com.genymobile.scrcpy.FakeContext
 import com.genymobile.scrcpy.util.Command
 import com.genymobile.scrcpy.wrappers.ServiceManager
@@ -43,6 +45,7 @@ class Connection(private val client: LocalSocket) : Thread() {
         private const val TAG = "Ziptie.Connection"
         private var packageCache = JSONObject()
         private const val ICON_CACHE_DIR = "/data/local/tmp/ziptie/icons2"
+        private var surface: Surface? = null
 
         init {
             val iconCacheDir = File(ICON_CACHE_DIR)
@@ -88,7 +91,7 @@ class Connection(private val client: LocalSocket) : Thread() {
         return JSONObject()
     }
 
-    private fun createDisplay(width: Int, height: Int, density: Int): JSONObject {
+    private fun createDisplayLegacy(width: Int, height: Int, density: Int): JSONObject {
         setSetting("global", "overlay_display_devices", "null")
         Thread.sleep(1000)
         val initialIds = ServiceManager.getDisplayManager().displayIds
@@ -103,6 +106,25 @@ class Connection(private val client: LocalSocket) : Thread() {
         ServiceManager.getWindowManager().setForcedDisplaySize(displayId, width, height)
         ServiceManager.getWindowManager().setForcedDisplayDensity(displayId, density)
         return JSONObject(mapOf("req" to "createDisplay", "displayId" to displayId))
+    }
+
+    private fun createDisplay(width: Int, height: Int, density: Int): JSONObject {
+        Log.i(TAG, "Creating display $width $height $density")
+        val surfaceControl = SurfaceControl.Builder()
+            .setName("Ziptie")
+            .setBufferSize(width, height)
+            .build()
+        
+        surface = Surface(surfaceControl)
+        val displayId = ServiceManager.getDisplayManager().createNewVirtualDisplay(
+            "Ziptie",
+            width,
+            height,
+            density,
+            surface,
+            0
+        )
+        return JSONObject(mapOf("req" to "createDisplay", "displayId" to displayId.display.displayId))
     }
     private fun resizeDisplay(displayId: Int, width: Int, height: Int, density: Int): JSONObject {
         ServiceManager.getWindowManager().setForcedDisplaySize(displayId, width, height)
