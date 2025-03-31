@@ -33,6 +33,7 @@ export const state = $state({
 	showLauncher: false,
 	showx11: false,
 	activeApp: null as string | null,
+	relativeMouse: false,
 
 	content: null! as HTMLElement,
 
@@ -310,15 +311,18 @@ const Setup: Component<{
 }
 
 const Settings: Component<{}, {
-
 }> = function() {
 	this.css = `
 		padding: 1em;
+		display: flex;
+		flex-direction: column;
+		gap: 1em;
 	`;
 
 	return (
 		<div>
 			<div class="m3-font-headline-medium">Settings</div>
+			<SetupToggle bind:val={use(state.relativeMouse)} title="Relative mouse mode" />
 			<Button type="tonal" on:click={() => mgr.startX11()}>startx</Button>
 			<Button type="tonal" on:click={() => {
 				if (document.fullscreenElement) {
@@ -575,13 +579,13 @@ const Main: Component<{}, {
 			e.preventDefault();
 		}
 		if (e.key === "Backspace") {
-			if (e.target === document.activeElement) {
+			if (e.target === document.activeElement && !state.showx11 && !state.showLauncher) {
 				// prevent closing the tab accidentally
 				e.preventDefault();
 			}
 		}
 		if (e.key === "Meta" && !state.showx11) {
-			state.showLauncher = true;
+			state.showLauncher = !state.showLauncher;
 			e.preventDefault();
 			e.stopPropagation();
 		}

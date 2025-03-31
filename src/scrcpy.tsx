@@ -176,11 +176,12 @@ export const Scrcpy: Component<{
 			e.preventDefault()
 			e.stopPropagation()
 
-
 			const target = e.currentTarget as HTMLElement
-			target.setPointerCapture(e.pointerId)
+			if (!document.pointerLockElement) {
+				target.setPointerCapture(e.pointerId)
+			}
 
-			const { type, clientX, clientY, button, buttons } = e
+			const { type, clientX, clientY, button, buttons, movementX, movementY } = e
 
 			const PointerEventButtonToAndroidButton = [
 				AndroidMotionEventButton.Primary,
@@ -198,18 +199,41 @@ export const Scrcpy: Component<{
 				];
 				switch (type) {
 					case "pointermove":
-						await mgr.writeMouseCmd([1, pointerX, pointerY, -1, 0]);
+						if (state.relativeMouse) {
+							await mgr.writeMouseCmd([3, movementX, movementY, -1, 0]);
+						} else {
+							await mgr.writeMouseCmd([1, pointerX, pointerY, -1, 0]);
+						}
 						break;
 					case "pointerdown":
-						await mgr.writeMouseCmd([1, pointerX, pointerY, jsButtonToX[e.button], 1]);
+						if (state.relativeMouse) {
+							if (!document.pointerLockElement) {
+								await target.requestPointerLock();
+							}
+							await mgr.writeMouseCmd([3, 0, 0, jsButtonToX[e.button], 1]);
+						} else {
+							await mgr.writeMouseCmd([1, pointerX, pointerY, jsButtonToX[e.button], 1]);
+						}
 						break;
 					case "pointerup":
-						await mgr.writeMouseCmd([1, pointerX, pointerY, jsButtonToX[e.button], 0]);
+						if (state.relativeMouse) {
+							await mgr.writeMouseCmd([3, 0, 0, jsButtonToX[e.button], 0]);
+							// if (document.pointerLockElement === target) {
+							// 	document.exitPointerLock();
+							// }
+						} else {
+							await mgr.writeMouseCmd([1, pointerX, pointerY, jsButtonToX[e.button], 0]);
+						}
 						break;
 				}
 			} else {
 				switch (type) {
 					case 'pointerdown':
+						// if (state.relativeMouse) {
+						// 	if (!document.pointerLockElement) {
+						// 		await target.requestPointerLock();
+						// 	}
+						// }
 						await controller.injectTouch({
 							action: AndroidMotionEventAction.Down,
 							pointerId: BigInt(e.pointerId),

@@ -13,6 +13,7 @@
 #define CMD_KEY 0
 #define CMD_MOUSE 1
 #define CMD_SCROLL 2
+#define CMD_MOUSE_RELATIVE 3
 
 typedef struct {
   int type;
@@ -31,6 +32,12 @@ typedef struct {
       int x;
       int y;
     } scroll;
+    struct {
+      int dx;
+      int dy;
+      int button;
+      int action;
+    } mouse_relative;
   };
 } command_t;
 
@@ -101,6 +108,12 @@ int main() {
       XWarpPointer(display, None, root, 0, 0, 0, 0, cmd.mouse.x, cmd.mouse.y);
       if (cmd.mouse.button != -1) {
         XTestFakeButtonEvent(display, cmd.mouse.button, cmd.mouse.action, CurrentTime);
+      }
+      XFlush(display);
+    } else if (cmd.type == CMD_MOUSE_RELATIVE) {
+      XTestFakeRelativeMotionEvent(display, cmd.mouse_relative.dx, cmd.mouse_relative.dy, 0);
+      if (cmd.mouse_relative.button != -1) {
+        XTestFakeButtonEvent(display, cmd.mouse_relative.button, cmd.mouse_relative.action, CurrentTime);
       }
       XFlush(display);
     } else if (cmd.type == CMD_KEY) {
