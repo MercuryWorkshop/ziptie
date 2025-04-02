@@ -43,6 +43,8 @@ debug.state = state;
 export const store = $store({
 	websocketUrl: "",
 	apps: [] as NativeApp[],
+	disableanim: false,
+	disablecharge: false,
 }, {
 	ident: "ziptie",
 	backing: "localstorage",
@@ -246,8 +248,6 @@ const Setup: Component<{
 	"on:connect": (opts: SetupOpts) => void,
 }, {
 	error: string,
-	disableanim: boolean,
-	disablecharge: boolean,
 	installPrompt: any,
 }> = function() {
 	this.css = `
@@ -270,8 +270,8 @@ const Setup: Component<{
 		}
 	`;
 
-	this.disableanim = false;
-	this.disablecharge = false;
+	store.disableanim = false;
+	store.disablecharge = false;
 	this.installPrompt = null;
 
 	const handleInstall = async () => {
@@ -293,8 +293,8 @@ const Setup: Component<{
 
 	const connect = async () => {
 		const opts = {
-			disableanim: this.disableanim,
-			disablecharge: this.disablecharge,
+			disableanim: store.disableanim,
+			disablecharge: store.disablecharge,
 		};
 		this.error = "";
 		try {
@@ -310,8 +310,8 @@ const Setup: Component<{
 			return;
 		}
 		const opts = {
-			disableanim: this.disableanim,
-			disablecharge: this.disablecharge,
+			disableanim: store.disableanim,
+			disablecharge: store.disablecharge,
 			websocketUrl: store.websocketUrl,
 		};
 		this.error = "";
@@ -330,8 +330,8 @@ const Setup: Component<{
 			<Card type="elevated">
 				<div class="settings">
 					<div class="m3-font-title-large">Settings</div>
-					<SetupToggle bind:val={use(this.disablecharge)} title="Disable charging" />
-					<SetupToggle bind:val={use(this.disableanim)} title="Disable animations" />
+					<SetupToggle bind:val={use(store.disablecharge)} title="Disable charging" />
+					<SetupToggle bind:val={use(store.disableanim)} title="Disable animations" />
 				</div>
 			</Card>
 
