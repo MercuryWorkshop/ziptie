@@ -71,14 +71,16 @@ export class AdbManager {
   mouseWriter: WritableStreamDefaultWriter<Uint8Array> | undefined;
 
   displayId: number = 0
-  density: number = 150
+  density: number = 0
   scrcpy: AdbScrcpyClient | undefined
   resolveCreateDisplay: ((value: unknown) => void) | undefined
 
   constructor(public adb: Adb, public fs: AdbSync) { }
 
-  async startScrcpy(content: HTMLElement) {
-    this.sendCommand({ req: "createDisplay", width: content.clientWidth, height: content.clientHeight, density: this.density });
+  async startScrcpy(content: HTMLElement, density: number) {
+    density = parseInt(density.toString());
+    this.density = density;
+    this.sendCommand({ req: "createDisplay", width: content.clientWidth, height: content.clientHeight, density: density });
     await new Promise(resolve => this.resolveCreateDisplay = resolve);
 
     const server = await fetch(BIN);
@@ -157,7 +159,7 @@ export class AdbManager {
     let oldInnerHeight = content.clientHeight;
     setInterval(() => {
       if (content.clientWidth != oldInnerWidth || content.clientHeight != oldInnerHeight) {
-        this.sendCommand({ req: "resizeDisplay", displayId: this.displayId, width: content.clientWidth, height: content.clientHeight, density: this.density });
+        this.sendCommand({ req: "resizeDisplay", displayId: this.displayId, width: content.clientWidth, height: content.clientHeight, density });
         oldInnerHeight = content.clientHeight;
         oldInnerWidth = content.clientWidth;
       }
@@ -192,6 +194,19 @@ export class AdbManager {
       console.error("x11 exited!");
       state.x11started = false;
       state.showx11 = false;
+    });
+  }
+
+  async startCodeServer() {
+    let desktop;
+    if (store.codeserverusesproot) {
+      desktop = this.termuxCmd(store.prootcmd.replace("%distro", store.distro).replace("%cmd", `SHELL=${store.defaultshellproot} ${store.codeservercmd.replace("%port", store.codeserverport.toString())}`));
+    } else {
+      desktop = this.termuxCmd(`SHELL=${store.defaultshelltermux} ${store.codeservercmd.replace("%port", store.codeserverport.toString())}`);
+    }
+    desktop.then(() => {
+      console.error("codeserver exited!");
+      state.codeserverstarted = false;
     });
   }
 

@@ -48,9 +48,13 @@ export const store = $store({
 	defaultshell: "sh",
 	defaultshelltermux: "bash",
 	defaultshellproot: "bash",
+	density: "150",
 	prootcmd: "proot-distro login %distro --shared-tmp -- %cmd",
 	startx11cmd: "GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0 PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde",
+	codeservercmd: "code-server --auth none --port %port",
+	codeserverport: 8080,
 	x11usesproot: true,
+	codeserverusesproot: false,
 	distro: "debian",
 }, {
 	ident: "ziptie",
@@ -73,7 +77,7 @@ async function connect(opts: SetupOpts) {
 	await mgr.startLogcat();
 	await mgr.startNative();
 
-	await mgr.startScrcpy(state.content);
+	await mgr.startScrcpy(state.content, store.density);
 
 	state.connected = true;
 	state.scrcpy = <Scrcpy client={mgr.scrcpy!} />;
@@ -389,14 +393,26 @@ const Settings: Component<{}, {
 					state.x11started = true;
 				}
 			}}>startx</Button>
+			<Button type="tonal" on:click={async () => {
+				if (!state.codeserverstarted) {
+					await mgr.startCodeServer();
+					state.codeserverstarted = true;
+				}
+			}}>start code server</Button>
+
+			<TextField bind:value={use(store.density)} name="Screen Density (DPI)" />
 			<SetupToggle bind:val={use(store.x11usesproot)} title="Use proot for X11" />
-			<TextField bind:value={use(store.distro)} name="Proot Distro" />
+			<TextField bind:value={use(store.startx11cmd)} name="X11 start command" />
+			<SetupToggle bind:val={use(store.codeserverusesproot)} title="Use proot for Codeserver" />
+			<TextField bind:value={use(store.codeservercmd)} name="Codeserver command" />
+
 			<TextField bind:value={use(store.defaultshell)} name="Default shell" />
 			<TextField bind:value={use(store.defaultshelltermux)} name="Default shell (Termux)" />
 			<TextField bind:value={use(store.defaultshellproot)} name="Default shell (Proot)" />
 
-			<TextField bind:value={use(store.startx11cmd)} name="X11 start command" />
+			<TextField bind:value={use(store.distro)} name="Proot Distro" />
 			<TextField bind:value={use(store.prootcmd)} name="Proot command" />
+
 
 
 			<Button type="tonal" on:click={() => {

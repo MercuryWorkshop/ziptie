@@ -50,7 +50,7 @@ export const Scrcpy: Component<{
 	display: flex;
 	position: relative;
 
-	> video {
+	video {
 		outline: none;
 	  /* height: 100%; */
 	}
