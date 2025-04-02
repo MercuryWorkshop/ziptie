@@ -43,6 +43,9 @@ const TerminalTab: Component<{
 		term.loadAddon(clip);
 		term.loadAddon(links);
 
+		term.onResize(({ cols, rows }) => {
+			this.process.resize(rows, cols);
+		})
 		term.open(this.term);
 		fit.fit();
 		setInterval(() => fit.fit(), 1000);
