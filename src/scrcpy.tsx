@@ -293,6 +293,10 @@ export const Scrcpy: Component<{
 		video.addEventListener("pointermove", injectTouch as any);
 		video.addEventListener("pointerup", injectTouch as any);
 		video.addEventListener("contextmenu", injectTouch as any);
+
+		video.addEventListener("pointerdown", () => {
+			video.focus();
+		})
 		video.setAttribute('tabindex', '0');
 		video.focus();
 	}
