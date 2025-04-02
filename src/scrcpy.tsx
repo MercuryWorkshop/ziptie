@@ -51,6 +51,7 @@ export const Scrcpy: Component<{
 	position: relative;
 
 	> video {
+		outline: none;
 	  /* height: 100%; */
 	}
 `

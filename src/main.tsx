@@ -45,6 +45,13 @@ export const store = $store({
 	apps: [] as NativeApp[],
 	disableanim: false,
 	disablecharge: false,
+	defaultshell: "sh",
+	defaultshelltermux: "bash",
+	defaultshellproot: "bash",
+	prootcmd: "proot-distro login %distro --shared-tmp -- %cmd",
+	startx11cmd: "GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0 PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde",
+	x11usesproot: true,
+	distro: "debian",
 }, {
 	ident: "ziptie",
 	backing: "localstorage",
@@ -382,11 +389,21 @@ const Settings: Component<{}, {
 					state.x11started = true;
 				}
 			}}>startx</Button>
+			<SetupToggle bind:val={use(store.x11usesproot)} title="Use proot for X11" />
+			<TextField bind:value={use(store.distro)} name="Proot Distro" />
+			<TextField bind:value={use(store.defaultshell)} name="Default shell" />
+			<TextField bind:value={use(store.defaultshelltermux)} name="Default shell (Termux)" />
+			<TextField bind:value={use(store.defaultshellproot)} name="Default shell (Proot)" />
+
+			<TextField bind:value={use(store.startx11cmd)} name="X11 start command" />
+			<TextField bind:value={use(store.prootcmd)} name="Proot command" />
+
+
 			<Button type="tonal" on:click={() => {
 				if (document.fullscreenElement) {
 					document.exitFullscreen();
 				} else {
-					this.root.requestFullscreen();
+					document.body.requestFullscreen();
 				}
 			}}>fullscreen</Button>
 		</div>
@@ -421,7 +438,9 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 		gap: 1rem;
 		overflow-y: scroll;
 		overflow-x: none;
-		scrollbar-width: 0;
+		scrollbar-width: none;
+		height: 100%;
+		user-select: none;
 
 		.items {
 			justify-self: top;
@@ -557,7 +576,7 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 				))}
 			</div>
 			<div class="appdrawer">
-				{use(state.openApps, x => x.slice(0, 9).filter(x => x.packageName !== "com.termux.x11").map(x => (
+				{use(state.openApps, x => x.filter(x => x.packageName !== "com.termux.x11").map(x => (
 					<button
 						class:active={use(this.shown, y => y === "scrcpy" && state.activeApp === x.packageName)}
 						on:click={() => {
@@ -599,6 +618,7 @@ const Main: Component<{
 		width: 100%;
 		height: 100%;
 		visibility: hidden;
+		overflow: hidden;
 		opacity: 0;
 		transition: visibility 0.2s ease-in-out, opacity 0.2s ease-in-out;
 		&.visible {

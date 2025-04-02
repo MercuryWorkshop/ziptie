@@ -123,34 +123,35 @@ export class AdbManager {
     );
 
     let oldClipboard = "";
-    setInterval(async () => {
-      try {
-        let items = await navigator.clipboard.read();
-        if (items.length == 0) return;
-        let item = items[0];
-        let clipboard;
-        if (item.types.includes("text/plain")) {
-          let blob = await item.getType("text/plain");
-          clipboard = await blob.text();
-        } else if (item.types.includes("image/png")) {
-          let blob = await item.getType("image/png");
-          let ab = await blob.arrayBuffer();
-          let base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(ab) as unknown as number[]));
-          clipboard = `data:image/png;base64,${base64}`;
-        } else {
-          console.log("unsupported clipboard type", item.types);
-          return;
-        }
-        if (clipboard == oldClipboard) return;
-        if (clipboard.startsWith("data:")) {
-          console.log("setting clipboard image", clipboard);
-          this.sendCommand({ req: "setClipboardImage", uri: clipboard });
-        } else {
-          this.sendCommand({ req: "setClipboardText", text: clipboard });
-        }
-        oldClipboard = clipboard;
-      } catch { }
-    }, 500);
+    if (location.protocol != "file:")
+      setInterval(async () => {
+        try {
+          let items = await navigator.clipboard.read();
+          if (items.length == 0) return;
+          let item = items[0];
+          let clipboard;
+          if (item.types.includes("text/plain")) {
+            let blob = await item.getType("text/plain");
+            clipboard = await blob.text();
+          } else if (item.types.includes("image/png")) {
+            let blob = await item.getType("image/png");
+            let ab = await blob.arrayBuffer();
+            let base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(ab) as unknown as number[]));
+            clipboard = `data:image/png;base64,${base64}`;
+          } else {
+            console.log("unsupported clipboard type", item.types);
+            return;
+          }
+          if (clipboard == oldClipboard) return;
+          if (clipboard.startsWith("data:")) {
+            console.log("setting clipboard image", clipboard);
+            this.sendCommand({ req: "setClipboardImage", uri: clipboard });
+          } else {
+            this.sendCommand({ req: "setClipboardText", text: clipboard });
+          }
+          oldClipboard = clipboard;
+        } catch { }
+      }, 500);
 
     let oldInnerWidth = content.clientWidth;
     let oldInnerHeight = content.clientHeight;
@@ -181,8 +182,17 @@ export class AdbManager {
     let socket = await this.adb.createSocket("tcp:12345");
     this.mouseWriter = socket.writable.getWriter() as any;
 
-    // GALLIUM_DRIVER=virpipe MESA_GL_VERSION_OVERRIDE=4.0
-    this.termuxCmd("proot-distro login debian --shared-tmp -- PULSE_SERVER=127.0.0.1 DISPLAY=:0 startlxde");
+    let desktop;
+    if (store.x11usesproot) {
+      desktop = this.termuxCmd(store.prootcmd.replace("%distro", store.distro).replace("%cmd", `SHELL=${store.defaultshellproot} ${store.startx11cmd}`));
+    } else {
+      desktop = this.termuxCmd(store.startx11cmd);
+    }
+    desktop.then(() => {
+      console.error("x11 exited!");
+      state.x11started = false;
+      state.showx11 = false;
+    });
   }
 
   async termuxCmd(cmd: string): Promise<number> {
@@ -238,8 +248,8 @@ export class AdbManager {
     logcat.binary().pipeTo(new WritableStream({
       write(packet) {
 
-        // if (packet.message.includes("Start server") || packet.tag.includes("Ziptie") || packet.tag.includes("scrcpy"))
-        //   console.log(packet.message);
+        if (packet.message.includes("Start server") || packet.tag.includes("Ziptie") || packet.tag.includes("scrcpy"))
+          console.log(packet.message);
       }
     }) as any);
   }

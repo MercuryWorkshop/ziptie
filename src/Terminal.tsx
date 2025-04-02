@@ -1,7 +1,7 @@
 import "dreamland";
 import { AdbSubprocessProtocol } from '@yume-chan/adb';
 import { Button, Card, Icon } from 'm3-dreamland';
-import { mgr } from './main';
+import { mgr, store } from './main';
 import { Terminal as XtermTerminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { ClipboardAddon } from '@xterm/addon-clipboard';
@@ -161,13 +161,13 @@ export const Terminal: Component<{}, {
 		let process: AdbSubprocessProtocol;
 		switch (shell) {
 			case "sh":
-				process = await mgr.adb.subprocess.shell("sh");
+				process = await mgr.adb.subprocess.shell(store.defaultshell);
 				break;
 			case "termux":
-				process = await mgr.termuxShell("TERM=xterm-256color bash");
+				process = await mgr.termuxShell("TERM=xterm-256color " + store.defaultshelltermux);
 				break;
-			case "debian":
-				process = await mgr.termuxShell("TERM=xterm-256color proot-distro login debian");
+			case "proot":
+				process = await mgr.termuxShell(store.prootcmd.replace("%distro", store.distro).replace("%cmd", store.defaultshellproot));
 				break;
 			default:
 				throw new Error("Unknown shell type");
@@ -221,10 +221,10 @@ export const Terminal: Component<{}, {
 					</Button>
 					{use(this.showMenu, (show) => show && (
 						<div class="menu">
-              <Card type="elevated">
-                <div class="menu-item" on:click={() => this.start("sh")}>Shell</div>
-                <div class="menu-item" on:click={() => this.start("termux")}>Termux</div>
-								<div class="menu-item" on:click={() => this.start("debian")}>Debian</div>
+							<Card type="elevated">
+								<div class="menu-item" on:click={() => this.start("sh")}>Shell</div>
+								<div class="menu-item" on:click={() => this.start("termux")}>Termux</div>
+								<div class="menu-item" on:click={() => this.start("debian")}>{store.distro.replace(/(^|\s)[a-z]/gi, l => l.toUpperCase())}</div>
 							</Card>
 						</div>
 					) || "")}
