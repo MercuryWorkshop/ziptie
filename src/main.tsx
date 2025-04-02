@@ -419,6 +419,9 @@ const Nav: Component<{ shown: Tabs }, {}> = function() {
 		padding-right: 0.25rem;
 		min-width: 4rem;
 		gap: 1rem;
+		overflow-y: scroll;
+		overflow-x: none;
+		scrollbar-width: 0;
 
 		.items {
 			justify-self: top;
