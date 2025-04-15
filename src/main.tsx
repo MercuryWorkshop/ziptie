@@ -415,6 +415,23 @@ const Setup: Component<
                 Connect Wirelessly
               </Button>
             </div>
+            <p>
+              to connect wirelessly you must be on the same network as the
+              device and have the{" "}
+              <a href="https://github.com/MercuryWorkshop/ziptie">native app</a>{" "}
+              installed
+            </p>
+            <p>
+              IMPORTANT: you MUST download termux from github{" "}
+              <a href="https://github.com/termux/termux-app/releases/tag/latest">
+                here
+              </a>
+              <br></br>
+              Termux releases from F-Droid or the Play Store will NOT WORK
+              <br></br>
+              Termux:X11 must also be installed, but it doesn't matter where the
+              app comes from
+            </p>
           </div>
           {use(
             this.error,
