@@ -207,16 +207,17 @@ export class AdbManager {
     desktop.then(() => {
       console.error("codeserver exited!");
       state.codeserverstarted = false;
+      state.x11started = state.x11started;
     });
   }
 
   async termuxCmd(cmd: string): Promise<number> {
-    let e = await this.adb.subprocess.spawn(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
+    let e = await this.adb.subprocess.spawn(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; ${cmd}'`]);
     logProcess(e);
     return await e.exit;
   }
   async termuxShell(cmd: string): Promise<AdbSubprocessProtocol> {
-    return await this.adb.subprocess.shell(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; export LD_PRELOAD=/data/data/com.termux/files/usr/lib/libtermux-exec.so; ${cmd}'`]);
+    return await this.adb.subprocess.shell(["run-as", "com.termux", "files/usr/bin/bash", "-c", `'export PATH=/data/data/com.termux/files/usr/bin:$PATH; ${cmd}'`]);
   }
 
   async writeMouseCmd(bytes: number[]) {

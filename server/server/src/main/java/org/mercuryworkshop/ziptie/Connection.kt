@@ -15,9 +15,12 @@ import android.util.DisplayMetrics
 import android.util.Log
 import android.view.Surface
 import android.view.SurfaceControl
+import android.view.Display
+import android.hardware.display.VirtualDisplay
 import com.genymobile.scrcpy.FakeContext
 import com.genymobile.scrcpy.util.Command
 import com.genymobile.scrcpy.wrappers.ServiceManager
+import com.genymobile.scrcpy.wrappers.DisplayManager
 import java.io.File
 import java.io.InputStream
 import java.nio.ByteBuffer
@@ -114,17 +117,41 @@ class Connection(private val client: LocalSocket) : Thread() {
             .setName("Ziptie")
             .setBufferSize(width, height)
             .build()
+
+        var display: VirtualDisplay;
+        val flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC or DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or DisplayManager.VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH or DisplayManager.VIRTUAL_DISPLAY_FLAG_ROTATES_WITH_CONTENT or DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED or DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP or DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED or DisplayManager.VIRTUAL_DISPLAY_FLAG_TOUCH_FEEDBACK_DISABLED;
+        
         
         surface = Surface(surfaceControl)
-        val displayId = ServiceManager.getDisplayManager().createNewVirtualDisplay(
-            "Ziptie",
-            width,
-            height,
-            density,
-            surface,
-            0
-        )
-        return JSONObject(mapOf("req" to "createDisplay", "displayId" to displayId.display.displayId))
+        
+        try {
+            Log.i(TAG, "Creating display with protected flags $flags")
+            display = ServiceManager.getDisplayManager().createNewVirtualDisplay(
+                "Ziptie",
+                width,
+                height,
+                density,
+                surface,
+                flags
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Wasn't able to create display with protected buffers, trying without", e)
+            try {
+                display = ServiceManager.getDisplayManager().createNewVirtualDisplay(
+                    "Ziptie",
+                    width,
+                    height,
+                    density,
+                    surface,
+                    0
+                )
+                Log.i(TAG, "Couldn't create secure display, user performance will be degraded")
+                // TODO: make sure screen doesn't go to sleep
+            } catch (e: Exception) {
+                throw Exception("Failed to create all displays")
+            }
+        }
+        return JSONObject(mapOf("req" to "createDisplay", "displayId" to display.display.displayId))
     }
     private fun resizeDisplay(displayId: Int, width: Int, height: Int, density: Int): JSONObject {
         ServiceManager.getWindowManager().setForcedDisplaySize(displayId, width, height)
