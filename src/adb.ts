@@ -325,7 +325,7 @@ export class AdbManager {
     }
 
     let connection = await device.connect();
-    console.log("connected");
+    console.log("connected, authingg");
 
     const CredentialStore: AdbWebCredentialStore = new AdbWebCredentialStore("skibidi");
     const transport = await AdbDaemonTransport.authenticate({

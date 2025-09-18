@@ -6,6 +6,7 @@ import { Scrcpy } from "./scrcpy";
 import { Terminal } from "./Terminal";
 import { proxyInitLibcurl, proxyLoadPage } from "./proxy";
 import { AdbDaemonWebsocketDevice } from "./WebSocketDevice";
+import { AdbDaemonWebRTCDevice } from "./WebRTCDevice";
 
 import type { IconifyIcon } from "@iconify/types";
 import {
@@ -36,6 +37,7 @@ export const debug: any = {};
 export let mgr: AdbManager;
 export const state = $state({
   connected: false,
+  connecting: false,
   openApps: [] as { packageName: string; id: number; persistentId: number }[],
   showLauncher: false,
   showx11: false,
@@ -54,6 +56,7 @@ debug.state = state;
 export const store = $store(
   {
     websocketUrl: "",
+    webrtcSignalingChannel: "",
     apps: [] as NativeApp[],
     disableanim: false,
     disablecharge: false,
@@ -82,6 +85,10 @@ async function connect(opts: SetupOpts) {
     if (opts.websocketUrl) {
       const device = new AdbDaemonWebsocketDevice(opts.websocketUrl);
       mgr = await AdbManager.connect(device);
+    } else if (opts.webrtcSignalingChannel) {
+      const device = new AdbDaemonWebRTCDevice(opts.webrtcSignalingChannel);
+      console.log("got device", device);
+      mgr = await AdbManager.connect(device);
     } else {
       mgr = await AdbManager.connect();
     }
@@ -92,7 +99,7 @@ async function connect(opts: SetupOpts) {
   await mgr.startLogcat();
   await mgr.startNative();
 
-  await mgr.startScrcpy(state.content, store.density);
+  await mgr.startScrcpy(state.content, parseInt(store.density));
 
   state.connected = true;
   state.scrcpy = <Scrcpy client={mgr.scrcpy!} />;
@@ -264,6 +271,7 @@ type SetupOpts = {
   disableanim: boolean;
   disablecharge: boolean;
   websocketUrl?: string;
+  webrtcSignalingChannel?: string;
 };
 
 const SetupToggle: Component<{ val: boolean; title: string }> = function () {
@@ -308,7 +316,7 @@ const Setup: Component<
   		padding: 1em;
       min-width: 75vw;
       min-height: 75vh;
-		}
+	}
 
 		.settings {
 			display: flex;
@@ -350,10 +358,13 @@ const Setup: Component<
       disablecharge: store.disablecharge,
     };
     this.error = "";
+    state.connecting = true;
     try {
       await this["on:connect"](opts);
     } catch (error) {
       this.error = error instanceof Error ? error.message : "Unknown error";
+    } finally {
+      state.connecting = false;
     }
   };
 
@@ -367,11 +378,37 @@ const Setup: Component<
       disablecharge: store.disablecharge,
       websocketUrl: store.websocketUrl,
     };
+  
+
     this.error = "";
+    state.connecting = true;
     try {
       await this["on:connect"](opts);
     } catch (error) {
       this.error = error instanceof Error ? error.message : "Unknown error";
+    } finally {
+      state.connecting = false;
+    }
+  };
+
+  const connectWebRTC = async () => {
+    if (!store.webrtcSignalingChannel) {
+      this.error = "Please enter a WebRTC signaling channel";
+      return;
+    }
+    const opts = {
+      disableanim: store.disableanim,
+      disablecharge: store.disablecharge,
+      webrtcSignalingChannel: store.webrtcSignalingChannel,
+    };
+    this.error = "";
+    state.connecting = true;
+    try {
+      await this["on:connect"](opts);
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : "Unknown error";
+    } finally {
+      state.connecting = false;
     }
   };
 
@@ -402,17 +439,25 @@ const Setup: Component<
             <TextField
               name="WebSocket URL"
               bind:value={use(store.websocketUrl)}
-              placeholder="ws://localhost:8080"
+              display="block"
+            />
+            <TextField
+              name="WebRTC Signaling Channel"
+              bind:value={use(store.webrtcSignalingChannel)}
               display="block"
             />
             <div style="display: flex; gap: 1em;">
-              <Button type="filled" iconType="left" on:click={connect}>
+              <Button type="filled" iconType="left" on:click={connect} extraOptions={{disabled: use(state.connecting)}}>
                 <Icon icon={iconPhonelinkSetup} />
                 Connect via USB
               </Button>
-              <Button type="filled" iconType="left" on:click={connectWireless}>
+              <Button type="filled" iconType="left" on:click={connectWireless} extraOptions={{disabled: use(state.connecting)}}>
                 <Icon icon={iconPhonelinkSetup} />
-                Connect Wirelessly
+                Connect Wirelessly (WebSocket)
+              </Button>
+              <Button type="filled" iconType="left" on:click={connectWebRTC} extraOptions={{disabled: use(state.connecting)}}>
+                <Icon icon={iconPhonelinkSetup} />
+                Connect Wirelessly (WebRTC)
               </Button>
             </div>
             <p>
@@ -429,7 +474,7 @@ const Setup: Component<
               <br></br>
               Termux releases from F-Droid or the Play Store will NOT WORK
               <br></br>
-              Termux:X11 must also be installed, but it doesn't matter where the
+              Termux:X11 must also be installed, but it doesn\'t matter where the
               app comes from
             </p>
           </div>
@@ -437,6 +482,7 @@ const Setup: Component<
             this.error,
             (x) => x && <div class="m3-font-body-medium">{x}</div>,
           )}
+          {use(state.connecting, (x) => x && <div>Connecting...</div>)}
           {use(
             this.installPrompt,
             (x) =>
@@ -452,6 +498,7 @@ const Setup: Component<
     </div>
   );
 };
+
 
 const Settings: Component<{}, {}> = function () {
   this.css = `
@@ -994,6 +1041,7 @@ const App: Component<{}, {}> = function () {
     <Setup
       on:connect={async (opts) => {
         await connect(opts);
+        console.log("Connected!");
         state.showSetup = false;
       }}
     />
