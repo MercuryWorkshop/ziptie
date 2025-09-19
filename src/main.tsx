@@ -440,8 +440,11 @@ const Setup: Component<
           <div class="m3-font-headline-medium">Ziptie</div>
           connect android to your chromebook
           <a href="https://github.com/MercuryWorkshop/ziptie">
-            a mercury workshop project
+            view github
           </a>
+	      <a href="https://mercurywork.shop">
+		    a mercury workshop project
+		  </a>
           <Card type="filled">
             <div class="settings">
               <div class="m3-font-title-large">Settings</div>
