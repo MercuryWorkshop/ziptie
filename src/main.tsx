@@ -152,8 +152,8 @@ const NativeAppView: Component<{ app: NativeApp }> = function () {
 		gap: 0.5em;
 
 		img {
-			width: 64px;
-			height: 64px;
+      width: 64px;
+      height: 64px;
 		}
 
 		.info {
@@ -167,7 +167,6 @@ const NativeAppView: Component<{ app: NativeApp }> = function () {
       <img src={this.app.icon} />
       <div class="info">
         <div>{this.app.label}</div>
-        <div class="m3-font-label-medium">{this.app.versionName}</div>
       </div>
     </div>
   );
@@ -185,9 +184,12 @@ const Launcher: Component<
   this.searchText = "";
 
   useChange([store.apps, this.searchText], () => {
-    this.filteredApps = store.apps.filter((app) =>
-      app.packageName.toLowerCase().includes(this.searchText.toLowerCase()),
-    );
+    const q = this.searchText.toLowerCase();
+    this.filteredApps = store.apps.filter((app) => {
+      const name = (app.label || "").toLowerCase();
+      const pkg = (app.packageName || "").toLowerCase();
+      return name.includes(q) || pkg.includes(q);
+    });
   });
 
   this.css = `
@@ -195,23 +197,42 @@ const Launcher: Component<
 		flex-direction: column;
 		gap: 1em;
 
-		.grid-wrapper {
-			overflow-y: scroll;
-			height: 50vh;
-		}
+    .grid-wrapper {
+      overflow-y: scroll;
+      height: 50vh;
+    }
 
-		.grid {
-			display: grid;
-			grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
-			gap: 1em;
-		}
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, 128px);
+      gap: 1em;
+      justify-content: start;
+    }
 
-		.CardClickable-m3-container {
-			width: 100%;
-			height: 100%;
-			align-items: center;
-			justify-content: center;
-		}
+    .CardClickable-m3-container {
+      width: 128px;
+      height: 128px;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5em;
+      box-sizing: border-box;
+    }
+
+    .grid .card-wrapper {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .grid img {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+    }
 	`;
 
   let textfield = (

@@ -23,6 +23,9 @@ import com.genymobile.scrcpy.wrappers.ServiceManager
 import com.genymobile.scrcpy.wrappers.DisplayManager
 import java.io.File
 import java.io.InputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.net.Socket
 import java.nio.ByteBuffer
 import org.json.JSONArray
 import org.json.JSONObject
@@ -329,17 +332,30 @@ class Connection(private val client: LocalSocket) : Thread() {
                             Base64.encodeToString(file.readBytes(), Base64.NO_WRAP)
                         }"
                         } else {
-                            val resIcon = resources.getDrawable(applicationInfo.icon)
-                            val bitmapIcon = Util.drawableToBitmap(resIcon)
-                            val pngIcon = Util.bitMapToPng(bitmapIcon, 20)
-                            icon =
-                                    "data:image/png;base64,${
-                            Base64.encodeToString(
-                                pngIcon,
-                                Base64.NO_WRAP
-                            )
-                        }"
-                            file.writeBytes(pngIcon)
+                                // Try manager IPC first
+                                val managerIcon = fetchIconFromManager(packageName)
+                                if (!managerIcon.isNullOrEmpty()) {
+                                    icon = managerIcon
+                                    try {
+                                        // write raw png bytes to cache for future
+                                        val base64 = managerIcon.substringAfter("base64,")
+                                        val pngBytes = Base64.decode(base64, Base64.DEFAULT)
+                                        file.writeBytes(pngBytes)
+                                    } catch (_: Exception) {
+                                    }
+                                } else {
+                                    val resIcon = resources.getDrawable(applicationInfo.icon)
+                                    val bitmapIcon = Util.drawableToBitmap(resIcon)
+                                    val pngIcon = Util.bitMapToPng(bitmapIcon, 20)
+                                    icon =
+                                            "data:image/png;base64,${
+                                            Base64.encodeToString(
+                                                    pngIcon,
+                                                    Base64.NO_WRAP
+                                            )
+                                    }"
+                                    file.writeBytes(pngIcon)
+                                }
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to get icon for $packageName")
@@ -389,6 +405,34 @@ class Connection(private val client: LocalSocket) : Thread() {
         configuration.setToDefaults()
 
         return Resources(assetManager, displayMetrics, configuration)
+    }
+
+    private fun fetchIconFromManager(packageName: String): String? {
+        try {
+            Socket("127.0.0.1", 9091).use { sock ->
+                val dout = DataOutputStream(sock.getOutputStream())
+                val din = DataInputStream(sock.getInputStream())
+                val req = "{\"req\":\"icon\",\"packageName\":\"$packageName\"}"
+                val reqBytes = req.toByteArray()
+                dout.writeInt(reqBytes.size)
+                dout.write(reqBytes)
+                dout.flush()
+
+                val len = din.readInt()
+                val respBytes = ByteArray(len)
+                din.readFully(respBytes)
+                val resp = String(respBytes)
+                val json = JSONObject(resp)
+                val debug = json.optString("debug", "")
+                if (!debug.isNullOrEmpty()) {
+                    Log.d(TAG, "IconServer debug for $packageName: $debug")
+                }
+                return json.optString("icon", null)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchIconFromManager failed: ${e.message}")
+            return null
+        }
     }
 
     private fun getSignatures(packageInfo: PackageInfo): JSONArray {

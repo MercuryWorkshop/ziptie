@@ -27,7 +27,7 @@ export class AdbDaemonWebRTCDevice implements AdbDaemonDevice {
     // Create RTCPeerConnection
     this.peerConnection = new RTCPeerConnection({
       iceServers: [
-        { urls: "stun:stun.voip.blackberry.com:3478" },
+        { urls: "stun:stun.blackberry.com:3478" },
       ]
     });
 
@@ -55,71 +55,68 @@ export class AdbDaemonWebRTCDevice implements AdbDaemonDevice {
     const offerRef = ref(database, `${this.signalingChannel}/offer`);
     const answerRef = ref(database, `${this.signalingChannel}/answer`);
     console.log(answerRef);
-    const candidatesRef = ref(database, `${this.signalingChannel}/candidates`);
 
     const remoteCandidates: RTCIceCandidateInit[] = [];
     let remoteDescriptionSet = false;
+    const localCandidates: RTCIceCandidate[] = [];
 
     // Handle ICE candidates
     this.peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            console.log("WebRTC: Found ICE candidate", event.candidate);
-            console.log("WebRTC: Found ICE candidate, sending to signaling server");
-            // Add local ICE candidate to Firebase
-            set(push(candidatesRef), {
-                type: "local",
-                candidate: event.candidate.toJSON()
-            });
+            localCandidates.push(event.candidate);
         }
     };
 
-    // Listen for remote ICE candidates
-    console.log("WebRTC: Listening for remote ICE candidates");
-    const candidatesListener = onValue(candidatesRef, (snapshot) => {
-        snapshot.forEach((childSnapshot) => {
-            const candidateData = childSnapshot.val();
-            if (candidateData && candidateData.type === "remote") {
-                console.log("WebRTC: Received remote ICE candidate");
-                if (remoteDescriptionSet) {
-                    this.peerConnection?.addIceCandidate(new RTCIceCandidate(candidateData.candidate));
-                } else {
-                    remoteCandidates.push(candidateData.candidate);
-                }
+    // Create offer
+    console.log("WebRTC: Creating offer");
+    const offer = await this.peerConnection.createOffer();
+    console.log("WebRTC: Offer created, setting local description");
+    await this.peerConnection.setLocalDescription(offer);
+
+    // Wait for ICE gathering to complete
+    await new Promise<void>(resolve => {
+        const checkState = () => {
+            if (this.peerConnection?.iceGatheringState === "complete") {
+                this.peerConnection.onicegatheringstatechange = null;
+                resolve();
             }
-        });
+        };
+        this.peerConnection!.onicegatheringstatechange = checkState;
+        checkState(); // Check immediately in case it's already complete
     });
+
+    console.log("WebRTC: Local description set, storing offer and candidates in Firebase");
+    // Store offer and candidates in Firebase
+    set(offerRef, { type: offer.type, sdp: offer.sdp, candidates: localCandidates });
 
     // Listen for answer
     console.log("WebRTC: Listening for answer");
     const answerListener = onValue(answerRef, (snapshot) => {
-        console.log("AAAA snapshot", snapshot);
-        const answer = snapshot.val();
-        console.log("AAAA", answer);
-
-        if (answer) {
-            console.log("WebRTC: Received answer");
-            //     // Listen for answer
-            console.log("WebRTC: Received answer from Firebase:", answer);
-            this.peerConnection?.setRemoteDescription(new RTCSessionDescription(answer)).then(() => {
-              console.log("what");  
-              remoteDescriptionSet = true;
-                remoteCandidates.forEach(candidate => this.peerConnection?.addIceCandidate(new RTCIceCandidate(candidate)));
+        const answerData = snapshot.val();
+        if (answerData) {
+            const timestamp = answerData.timestamp;
+            if (timestamp && Date.now() - timestamp > 5 * 60 * 1000) { // 5 minutes
+                console.log("WebRTC: Received expired answer, ignoring.");
+                return;
+            }
+            if (this.peerConnection?.signalingState !== 'have-local-offer') {
+                console.log("WebRTC: Received answer in wrong state, ignoring.", this.peerConnection?.signalingState);
+                return;
+            }
+            console.log("WebRTC: Received answer from Firebase:", answerData);
+            this.peerConnection?.setRemoteDescription(new RTCSessionDescription(answerData)).then(() => {
+                remoteDescriptionSet = true;
+                // Add remote candidates
+                if (answerData.candidates) {
+                
+                  for (let candidate of answerData.candidates) {
+                console.log("CANDIDATE, adding", candidate);
+                    this.peerConnection?.addIceCandidate(new RTCIceCandidate(candidate));
+                    }
+                }
                 remoteCandidates.length = 0; // Clear the queue
             }).catch(e => console.error("Error setting remote description:", e));
         }
-    });
-
-    // Create offer
-    console.log("WebRTC: Creating offer");
-    this.peerConnection.createOffer().then((offer) => {
-        console.log("WebRTC: Offer created, setting local description");
-        return this.peerConnection?.setLocalDescription(offer).then(() => {
-            console.log("WebRTC: Local description set, storing offer in Firebase");
-            // Store offer in Firebase
-            return set(offerRef, { type: offer.type, sdp: offer.sdp });
-        });
-    }).catch((error) => {
-        console.error("Error creating offer:", error);
     });
 
     await dataChannelOpen;
