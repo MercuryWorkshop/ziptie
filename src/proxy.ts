@@ -1,7 +1,7 @@
 import { AdbSocket } from "@yume-chan/adb";
 
 // @ts-expect-error libcurl has no typedefs
-import { libcurl } from "../out/libcurl_full.mjs";
+import { libcurl } from "libcurl.js/bundled";
 import { mgr } from "./main";
 
 // libcurl supports a custom tcp transport

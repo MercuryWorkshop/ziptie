@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile"
+import { literalsHtmlCssMinifier } from "@literals/rollup-plugin-html-css-minifier";
 import fs from 'fs';
 
 export default defineConfig({
@@ -7,6 +8,9 @@ export default defineConfig({
     exclude: ["@yume-chan/fetch-scrcpy-server", "@yume-chan/pcm-player"],
   },
   plugins: [
+    literalsHtmlCssMinifier({
+			include: ["src/**/*.tsx"],
+		}),
     viteSingleFile(),
     {
       name: 'vite-plugin-arraybuffer',

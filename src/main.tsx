@@ -1,7 +1,10 @@
-import "dreamland";
-
-import { AdbManager } from "./adb";
 import "./style.css";
+//@ts-expect-error styles dont come with types
+import "m3-dreamland/styles";
+import { DynamicScheme, Hct, SchemeStyles, Variant } from "m3-dreamland";
+
+import { Component, css, createState, createStore, ComponentInstance } from "dreamland/core";
+import { AdbManager } from "./adb";
 import { Scrcpy } from "./scrcpy";
 import { Terminal } from "./Terminal";
 import { proxyInitLibcurl, proxyLoadPage } from "./proxy";
@@ -12,14 +15,12 @@ import type { IconifyIcon } from "@iconify/types";
 import {
   Button,
   Card,
-  CardClickable,
   Dialog,
   FAB,
   Icon,
   NavListButton,
-  StyleFromParams,
   Switch,
-  TextField,
+  TextFieldFilled
 } from "m3-dreamland";
 
 import iconPhonelinkSetup from "@ktibow/iconset-material-symbols/phonelink-setup";
@@ -31,11 +32,10 @@ import iconMonitorOutline from "@ktibow/iconset-material-symbols/monitor-outline
 import iconTerminal from "@ktibow/iconset-material-symbols/terminal";
 
 import iconApps from "@ktibow/iconset-material-symbols/apps";
-
 export const debug: any = {};
 (window as any).dbg = debug;
 export let mgr: AdbManager;
-export const state = $state({
+export const state = createState({
   connected: false,
   connecting: false,
   openApps: [] as { packageName: string; id: number; persistentId: number }[],
@@ -46,14 +46,14 @@ export const state = $state({
 
   content: null! as HTMLElement,
 
-  scrcpy: null! as ComponentElement<typeof Scrcpy>,
-  terminal: <Terminal />,
+  scrcpy: null! as ComponentInstance<typeof Scrcpy>,
+  terminal: <Terminal /> as ComponentInstance<typeof Terminal>,
   x11started: false,
   showSetup: true,
   codeserverstarted: false,
 });
 debug.state = state;
-export const store = $store(
+export const store = createStore(
   {
     websocketUrl: "",
     webrtcSignalingChannel: "",
@@ -144,7 +144,17 @@ type NativeApp = {
 };
 
 const NativeAppView: Component<{ app: NativeApp }> = function () {
-  this.css = `
+  return (
+    <div>
+      <img src={this.app.icon} />
+      <div class="info">
+        <div>{this.app.label}</div>
+      </div>
+    </div>
+  );
+};
+
+NativeAppView.style = css`
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -160,17 +170,7 @@ const NativeAppView: Component<{ app: NativeApp }> = function () {
 			text-align: center;
 			overflow-wrap: anywhere;
 		}
-	`;
-
-  return (
-    <div>
-      <img src={this.app.icon} />
-      <div class="info">
-        <div>{this.app.label}</div>
-      </div>
-    </div>
-  );
-};
+`;
 
 const Launcher: Component<
   {
@@ -183,19 +183,72 @@ const Launcher: Component<
 > = function () {
   this.searchText = "";
 
-  useChange([store.apps, this.searchText], () => {
-    const q = this.searchText.toLowerCase();
-    this.filteredApps = store.apps.filter((app) => {
+  use(store.apps, this.searchText).listen(([apps, searchText]) => {
+    const q = searchText.toLowerCase();
+    this.filteredApps = apps.filter((app) => {
       const name = (app.label || "").toLowerCase();
       const pkg = (app.packageName || "").toLowerCase();
       return name.includes(q) || pkg.includes(q);
     });
   });
 
-  this.css = `
-		display: flex;
-		flex-direction: column;
-		gap: 1em;
+  let textfield = (
+    <TextFieldFilled
+      supporting="App name"
+      value={use(this.searchText)}
+      display="block"
+    />
+  );
+  let input = textfield.querySelector("input")!;
+  input.addEventListener("input", () => {
+    this.searchText = input.value;
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    if (!this.filteredApps[0]) return;
+    this.launch(this.filteredApps[0].packageName);
+    this.searchText = "";
+    e.preventDefault();
+  });
+  textfield.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    input.focus();
+  });
+  use(state.showLauncher).listen((show) => {
+    if (show) {
+      setTimeout(() => input.focus(), 100);
+    }
+  });
+
+  return (
+    <div>
+      {textfield}
+      <div class="grid-wrapper">
+        <div class="grid">
+          {use(this.filteredApps).mapEach((x) => (
+              <Card
+                variant="filled"
+                on:click={() => {
+                  this.launch(x.packageName);
+                  this.searchText = "";
+                }}
+              >
+                <NativeAppView app={x} />
+              </Card>
+            ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+Launcher.style = css`
+    :scope {
+      display: flex;
+      flex-direction: column;
+      gap: 1em;
+    }
 
     .grid-wrapper {
       overflow-y: scroll;
@@ -209,7 +262,7 @@ const Launcher: Component<
       justify-content: start;
     }
 
-    .CardClickable-m3-container {
+    .Card-m3-container {
       width: 128px;
       height: 128px;
       aspect-ratio: 1 / 1;
@@ -233,60 +286,7 @@ const Launcher: Component<
       height: 64px;
       object-fit: contain;
     }
-	`;
-
-  let textfield = (
-    <TextField
-      name="App name"
-      bind:value={use(this.searchText)}
-      display="block"
-    />
-  );
-  let input = textfield.querySelector("input")!;
-  input.addEventListener("input", () => {
-    this.searchText = input.value;
-  });
-  input.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter") return;
-    if (!this.filteredApps[0]) return;
-    this.launch(this.filteredApps[0].packageName);
-    this.searchText = "";
-    e.preventDefault();
-  });
-  textfield.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    input.focus();
-  });
-  useChange(state.showLauncher, () => {
-    if (state.showLauncher) {
-      setTimeout(() => input.focus(), 100);
-    }
-  });
-
-  return (
-    <div>
-      {textfield}
-      <div class="grid-wrapper">
-        <div class="grid">
-          {use(this.filteredApps, (x) =>
-            x.map((x) => (
-              <CardClickable
-                type="filled"
-                on:click={() => {
-                  this.launch(x.packageName);
-                  this.searchText = "";
-                }}
-              >
-                <NativeAppView app={x} />
-              </CardClickable>
-            )),
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
+`;
 
 type SetupOpts = {
   disableanim: boolean;
@@ -296,23 +296,24 @@ type SetupOpts = {
 };
 
 const SetupToggle: Component<{ val: boolean; title: string }> = function () {
-  this.css = `
-		display: flex;
-		gap: 0.5em;
-		align-items: center;
-
-		label {
-			height: 2rem;
-		}
-	`;
-
   return (
     <div>
-      <Switch bind:checked={use(this.val)} />
+      <Switch value={use(this.val)} />
       {this.title}
     </div>
   );
 };
+SetupToggle.style = css`
+    :scope {
+      display: flex;
+      gap: 0.5em;
+      align-items: center;
+    }
+
+		label {
+			height: 2rem;
+		}
+`;
 
 const Setup: Component<
   {
@@ -322,36 +323,7 @@ const Setup: Component<
     error: string;
     installPrompt: any;
   }
-> = function () {
-  this.css = `
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    .main {
-  		display: flex;
-  		flex-direction: column;
-  		gap: 1em;
-
-  		padding: 1em;
-      min-width: 75vw;
-      min-height: 75vh;
-	}
-
-		.settings {
-			display: flex;
-			flex-direction: column;
-			gap: 1em;
-		}
-
-		.connection-options {
-			display: flex;
-			flex-direction: column;
-			gap: 1em;
-		}
-	`;
-
+> = function (cx) {
   store.disableanim = false;
   store.disablecharge = false;
   this.installPrompt = null;
@@ -366,7 +338,7 @@ const Setup: Component<
     this.installPrompt = null;
   };
 
-  this.mount = () => {
+  cx.mount = () => {
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
       this.installPrompt = e;
@@ -435,7 +407,7 @@ const Setup: Component<
 
   return (
     <div>
-      <Card type="elevated">
+      <Card variant="elevated">
         <div class="main">
           <div class="m3-font-headline-medium">Ziptie</div>
           connect android to your chromebook
@@ -445,41 +417,41 @@ const Setup: Component<
 	      <a href="https://mercurywork.shop">
 		    a mercury workshop project
 		  </a>
-          <Card type="filled">
+          <Card variant="filled">
             <div class="settings">
               <div class="m3-font-title-large">Settings</div>
               <SetupToggle
-                bind:val={use(store.disablecharge)}
+                val={use(store.disablecharge)}
                 title="Disable charging"
               />
               <SetupToggle
-                bind:val={use(store.disableanim)}
+                val={use(store.disableanim)}
                 title="Disable animations"
               />
             </div>
           </Card>
           <div class="connection-options">
             <div class="m3-font-title-large">Connection</div>
-            <TextField
-              name="WebSocket URL"
-              bind:value={use(store.websocketUrl)}
+            <TextFieldFilled
+              supporting="WebSocket URL"
+              value={use(store.websocketUrl)}
               display="block"
             />
-            <TextField
-              name="WebRTC Signaling Channel"
-              bind:value={use(store.webrtcSignalingChannel)}
+            <TextFieldFilled
+              supporting="WebRTC Signaling Channel"
+              value={use(store.webrtcSignalingChannel)}
               display="block"
             />
             <div style="display: flex; gap: 1em;">
-              <Button type="filled" iconType="left" on:click={connect} extraOptions={{disabled: use(state.connecting)}}>
+              <Button variant="filled" icon="left" on:click={connect} disabled={use(state.connecting)}>
                 <Icon icon={iconPhonelinkSetup} />
                 Connect via USB
               </Button>
-              <Button type="filled" iconType="left" on:click={connectWireless} extraOptions={{disabled: use(state.connecting)}}>
+              <Button variant="filled" icon="left" on:click={connectWireless} disabled={use(state.connecting)}>
                 <Icon icon={iconPhonelinkSetup} />
                 Connect Wirelessly (WebSocket)
               </Button>
-              <Button type="filled" iconType="left" on:click={connectWebRTC} extraOptions={{disabled: use(state.connecting)}}>
+              <Button variant="filled" icon="left" on:click={connectWebRTC} disabled={use(state.connecting)}>
                 <Icon icon={iconPhonelinkSetup} />
                 Connect Wirelessly (WebRTC)
               </Button>
@@ -503,44 +475,64 @@ const Setup: Component<
             </p>
           </div>
           {use(
-            this.error,
-            (x) => x && <div class="m3-font-body-medium">{x}</div>,
-          )}
-          {use(state.connecting, (x) => x && <div>Connecting...</div>)}
+            this.error
+          ).andThen(<div class="m3-font-body-medium">{use(this.error)}</div>, null)}
+          {use(state.connecting).andThen(<div>Connecting...</div>, null)}
           {use(
-            this.installPrompt,
-            (x) =>
-              x && (
-                <Button type="filled" on:click={handleInstall}>
+            this.installPrompt).andThen(
+                <Button variant="filled" on:click={handleInstall}>
                   Install App
-                </Button>
-              ),
+                </Button>, null
           )}
-          <LogView></LogView>
+          <LogView scrolling={false}></LogView>
         </div>
       </Card>
     </div>
   );
 };
 
+Setup.style = css`
+    :scope {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .main {
+  		display: flex;
+  		flex-direction: column;
+  		gap: 1em;
+
+  		padding: 1em;
+      min-width: 75vw;
+      min-height: 75vh;
+	  }
+
+		.settings {
+			display: flex;
+			flex-direction: column;
+			gap: 1em;
+		}
+
+		.connection-options {
+			display: flex;
+			flex-direction: column;
+			gap: 1em;
+		}
+`;
 
 const Settings: Component<{}, {}> = function () {
-  this.css = `
-		padding: 1em;
-		display: flex;
-		flex-direction: column;
-		gap: 1em;
-	`;
-
   return (
     <div>
       <div class="m3-font-headline-medium">Settings</div>
       <SetupToggle
-        bind:val={use(state.relativeMouse)}
+        val={use(state.relativeMouse)}
         title="Relative mouse mode"
       />
       <Button
-        type="tonal"
+        variant="tonal"
         on:click={async () => {
           if (!state.x11started) {
             await mgr.startX11();
@@ -551,7 +543,7 @@ const Settings: Component<{}, {}> = function () {
         startx
       </Button>
       <Button
-        type="tonal"
+        variant="tonal"
         on:click={async () => {
           if (!state.codeserverstarted) {
             await mgr.startCodeServer();
@@ -564,36 +556,36 @@ const Settings: Component<{}, {}> = function () {
         start code server
       </Button>
 
-      <TextField bind:value={use(store.density)} name="Screen Density (DPI)" />
+      <TextFieldFilled value={use(store.density)} supporting="Screen Density (DPI)" />
       <SetupToggle
-        bind:val={use(store.x11usesproot)}
+        val={use(store.x11usesproot)}
         title="Use proot for X11"
       />
-      <TextField bind:value={use(store.startx11cmd)} name="X11 start command" />
+      <TextFieldFilled value={use(store.startx11cmd)} supporting="X11 start command" />
       <SetupToggle
-        bind:val={use(store.codeserverusesproot)}
+        val={use(store.codeserverusesproot)}
         title="Use proot for Codeserver"
       />
-      <TextField
-        bind:value={use(store.codeservercmd)}
-        name="Codeserver command"
+      <TextFieldFilled
+        value={use(store.codeservercmd)}
+        supporting="Codeserver command"
       />
 
-      <TextField bind:value={use(store.defaultshell)} name="Default shell" />
-      <TextField
-        bind:value={use(store.defaultshelltermux)}
-        name="Default shell (Termux)"
+      <TextFieldFilled value={use(store.defaultshell)} supporting="Default shell" />
+      <TextFieldFilled
+        value={use(store.defaultshelltermux)}
+        supporting="Default shell (Termux)"
       />
-      <TextField
-        bind:value={use(store.defaultshellproot)}
-        name="Default shell (Proot)"
+      <TextFieldFilled
+        value={use(store.defaultshellproot)}
+        supporting="Default shell (Proot)"
       />
 
-      <TextField bind:value={use(store.distro)} name="Proot Distro" />
-      <TextField bind:value={use(store.prootcmd)} name="Proot command" />
+      <TextFieldFilled value={use(store.distro)} supporting="Proot Distro" />
+      <TextFieldFilled value={use(store.prootcmd)} supporting="Proot command" />
 
       <Button
-        type="tonal"
+        variant="tonal"
         on:click={() => {
           if (document.fullscreenElement) {
             document.exitFullscreen();
@@ -608,6 +600,15 @@ const Settings: Component<{}, {}> = function () {
   );
 };
 
+Settings.style = css`
+  :scope {
+    padding: 1em;
+		display: flex;
+		flex-direction: column;
+		gap: 1em;
+  }
+`
+
 type Tabs = "scrcpy" | "terminal" | "code" | "settings";
 type TabRoute = {
   cond: (tabs: Tabs) => boolean;
@@ -619,26 +620,138 @@ type TabRoute = {
 };
 
 const Nav: Component<{ shown: Tabs }, {}> = function () {
-  this.css = `
-		position: sticky;
-		top: 0;
-		left: 0;
+  const routes: TabRoute[] = [
+    // {
+    // 	label: "Screen",
+    // 	icon: iconSmartphoneOutline,
+    // 	sicon: iconSmartphone,
+    // 	cond: x => x === "scrcpy" && !state.showx11,
+    // 	click: () => {
+    // 		state.showx11 = false;
+    // 		this.shown = "scrcpy";
+    // 	}
+    // },
+    {
+      label: "X11",
+      icon: iconMonitorOutline,
+      sicon: iconMonitor,
+      cond: (x) => x === "scrcpy" && state.showx11,
+      disabled: () => !state.x11started,
+      click: () => {
+        mgr.openApp("com.termux.x11");
+        state.showx11 = true;
+        this.shown = "scrcpy";
+      },
+    },
+    {
+      label: "VSCode",
+      icon: iconCodeBlocksOutline,
+      sicon: iconCodeBlocks,
+      cond: (x) => x === "code",
+      disabled: () => !state.codeserverstarted,
+      click: async () => {
+        console.log("loading page");
+        await proxyInitLibcurl();
+        this.shown = "code";
+      },
+    },
+    {
+      label: "Terminal",
+      icon: iconTerminal,
+      sicon: iconTerminal,
+      cond: (x) => x === "terminal",
+      disabled: () => false,
+      click: () => (this.shown = "terminal"),
+    },
+    {
+      label: "Settings",
+      icon: iconPhonelinkSetupOutline,
+      sicon: iconPhonelinkSetup,
+      cond: (x) => x === "settings",
+      disabled: () => false,
+      click: () => (this.shown = "settings"),
+    },
+  ];
 
-		align-self: flex-start;
-		display: flex;
-		flex-shrink: 0;
-		flex-direction: column;
-		min-height: 100vh;
-		padding-top: 1rem;
-		padding-left: 0.25rem;
-		padding-right: 0.25rem;
-		min-width: 4rem;
-		gap: 1rem;
-		overflow-y: scroll;
-		overflow-x: none;
-		scrollbar-width: none;
-		height: 100%;
-		user-select: none;
+  return (
+    <div>
+      <div class="items">
+        {routes.map((x) => (
+          <NavListButton
+            type="rail"
+            icon={use(this.shown).map((y) => (x.cond(y) ? x.sicon : x.icon))}
+            selected={use(this.shown).map((y) => x.cond(y))}
+            extraOptions={{
+              disabled: use(state.x11started, x.disabled),
+            }}
+            on:click={x.click}
+          >
+            {x.label}
+          </NavListButton>
+        ))}
+      </div>
+      <div class="appdrawer">
+        {use(state.openApps).map((x) =>
+          x
+            .filter((x) => x.packageName !== "com.termux.x11")
+            .map((x) => (
+              <button
+                class:active={use(
+                  this.shown).map(
+                  (y) => y === "scrcpy" && state.activeApp === x.packageName,
+                )}
+                on:click={() => {
+                  state.showx11 = false;
+                  state.showLauncher = false;
+                  this.shown = "scrcpy";
+                  mgr.openApp(x.packageName);
+                  state.activeApp = x.packageName;
+                }}
+              >
+                <img
+                  src={
+                    store.apps.find((y) => y.packageName === x.packageName)
+                      ?.icon
+                  }
+                />
+              </button>
+            )),
+        )}
+
+        <FAB
+          size="small"
+          icon={iconApps}
+          color="primary"
+          on:click={() => {
+            state.showLauncher = true;
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+Nav.style = css`
+    :scope {
+      position: sticky;
+      top: 0;
+      left: 0;
+
+      align-self: flex-start;
+      display: flex;
+      flex-shrink: 0;
+      flex-direction: column;
+      min-height: 100vh;
+      padding-top: 1rem;
+      padding-left: 0.25rem;
+      padding-right: 0.25rem;
+      min-width: 4rem;
+      gap: 1rem;
+      overflow-y: scroll;
+      overflow-x: none;
+      scrollbar-width: none;
+      height: 100%;
+      user-select: none;
+    }
 
 		.items {
 			justify-self: top;
@@ -701,119 +814,7 @@ const Nav: Component<{ shown: Tabs }, {}> = function () {
 			opacity: 0.5;
 			cursor: not-allowed;
 		}
-	`;
-
-  const routes: TabRoute[] = [
-    // {
-    // 	label: "Screen",
-    // 	icon: iconSmartphoneOutline,
-    // 	sicon: iconSmartphone,
-    // 	cond: x => x === "scrcpy" && !state.showx11,
-    // 	click: () => {
-    // 		state.showx11 = false;
-    // 		this.shown = "scrcpy";
-    // 	}
-    // },
-    {
-      label: "X11",
-      icon: iconMonitorOutline,
-      sicon: iconMonitor,
-      cond: (x) => x === "scrcpy" && state.showx11,
-      disabled: () => !state.x11started,
-      click: () => {
-        mgr.openApp("com.termux.x11");
-        state.showx11 = true;
-        this.shown = "scrcpy";
-      },
-    },
-    {
-      label: "VSCode",
-      icon: iconCodeBlocksOutline,
-      sicon: iconCodeBlocks,
-      cond: (x) => x === "code",
-      disabled: () => !state.codeserverstarted,
-      click: async () => {
-        console.log("loading page");
-        await proxyInitLibcurl();
-        this.shown = "code";
-      },
-    },
-    {
-      label: "Terminal",
-      icon: iconTerminal,
-      sicon: iconTerminal,
-      cond: (x) => x === "terminal",
-      disabled: () => false,
-      click: () => (this.shown = "terminal"),
-    },
-    {
-      label: "Settings",
-      icon: iconPhonelinkSetupOutline,
-      sicon: iconPhonelinkSetup,
-      cond: (x) => x === "settings",
-      disabled: () => false,
-      click: () => (this.shown = "settings"),
-    },
-  ];
-
-  return (
-    <div>
-      <div class="items">
-        {routes.map((x) => (
-          <NavListButton
-            type="rail"
-            icon={use(this.shown, (y) => (x.cond(y) ? x.sicon : x.icon))}
-            selected={use(this.shown, (y) => x.cond(y))}
-            extraOptions={{
-              disabled: use(state.x11started, x.disabled),
-            }}
-            on:click={x.click}
-          >
-            {x.label}
-          </NavListButton>
-        ))}
-      </div>
-      <div class="appdrawer">
-        {use(state.openApps, (x) =>
-          x
-            .filter((x) => x.packageName !== "com.termux.x11")
-            .map((x) => (
-              <button
-                class:active={use(
-                  this.shown,
-                  (y) => y === "scrcpy" && state.activeApp === x.packageName,
-                )}
-                on:click={() => {
-                  state.showx11 = false;
-                  state.showLauncher = false;
-                  this.shown = "scrcpy";
-                  mgr.openApp(x.packageName);
-                  state.activeApp = x.packageName;
-                }}
-              >
-                <img
-                  src={
-                    store.apps.find((y) => y.packageName === x.packageName)
-                      ?.icon
-                  }
-                />
-              </button>
-            )),
-        )}
-
-        <FAB
-          size="small"
-          icon={iconApps}
-          color="primary"
-          on:click={() => {
-            state.showLauncher = true;
-          }}
-        />
-      </div>
-    </div>
-  );
-};
-
+`;
 const Main: Component<
   {
     show: boolean;
@@ -823,18 +824,125 @@ const Main: Component<
     codeframe: HTMLIFrameElement;
     content: HTMLElement;
   }
-> = function () {
-  this.css = `
-		display: flex;
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		visibility: hidden;
-		overflow: hidden;
-		opacity: 0;
-		transition: visibility 0.2s ease-in-out, opacity 0.2s ease-in-out;
+> = function (cx) {
+  let launcher = (
+    <Launcher
+      launch={(name: string) => {
+        this.shown = "scrcpy";
+        mgr.openApp(name);
+        state.showx11 = false;
+        state.showLauncher = false;
+        state.activeApp = name;
+      }}
+    />
+  );
+  this.shown = "settings";
+
+  cx.mount = () => {
+    state.content = this.content;
+  };
+
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key === "Escape") {
+        state.showLauncher = false;
+        e.preventDefault();
+      }
+      if (e.key === "Backspace") {
+        if (
+          e.target === document.activeElement &&
+          !state.showx11 &&
+          !state.showLauncher
+        ) {
+          // prevent closing the tab accidentally
+          e.preventDefault();
+        }
+      }
+      if (e.key === "Meta" && !state.showx11 && !state.showSetup) {
+        state.showLauncher = !state.showLauncher;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    {
+      capture: true,
+    },
+  );
+
+  let loadedFrame = false;
+  use(this.shown).listen((x: Tabs) => {
+    if (x === "code" && !loadedFrame) {
+      proxyLoadPage(
+        this.codeframe,
+        "http://localhost:8080",
+        "http://localhost:8080",
+      );
+      loadedFrame = true;
+    }
+  });
+
+  return (
+    <div class:visible={use(this.show)}>
+      <Dialog
+        headline="Apps"
+        open={use(state.showLauncher)}
+        closeOnClick={true}
+      >
+        {launcher}
+        <div class="apps-actions">
+          <Button variant="tonal" on:click={() => (state.showLauncher = false)}>
+            Close
+          </Button>
+        </div>
+      </Dialog>
+
+      <Nav shown={use(this.shown)} />
+      <div class="content" this={use(this.content)}>
+        <iframe
+          id="codeframe"
+          this={use(this.codeframe)}
+          class:visible={use(this.shown).map((x) => x === "code")}
+        />
+        <div
+          id="scrcpy-container"
+          class:visible={use(this.shown).map((x) => x === "scrcpy")}
+        >
+          {use(state.scrcpy)}
+        </div>
+        {use(this.shown).map((x: Tabs) => {
+          if (x !== "scrcpy" && state.scrcpy) {
+            state.showx11 = false;
+          }
+
+          if (x === "scrcpy") {
+            // ...
+          } else if (x === "terminal") {
+            return state.terminal;
+          } else if (x === "code") {
+            //...
+          } else if (x === "settings") {
+            return <Settings />;
+          }
+        })}
+      </div>
+    </div>
+  );
+};
+
+Main.style = css`
+    :scope {
+      display: flex;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      visibility: hidden;
+      overflow: hidden;
+      opacity: 0;
+		  transition: visibility 0.2s ease-in-out, opacity 0.2s ease-in-out;
+    }
 		&.visible {
 			visibility: visible;
 			opacity: 1;
@@ -881,112 +989,14 @@ const Main: Component<
 		#scrcpy-container.visible {
 			visibility: visible;
 		}
-	`;
-
-  let launcher = (
-    <Launcher
-      launch={(name: string) => {
-        this.shown = "scrcpy";
-        mgr.openApp(name);
-        state.showx11 = false;
-        state.showLauncher = false;
-        state.activeApp = name;
-      }}
-    />
-  );
-  this.shown = "settings";
-
-  this.mount = () => {
-    state.content = this.content;
-  };
-
-  document.addEventListener(
-    "keydown",
-    (e) => {
-      if (e.key === "Escape") {
-        state.showLauncher = false;
-        e.preventDefault();
-      }
-      if (e.key === "Backspace") {
-        if (
-          e.target === document.activeElement &&
-          !state.showx11 &&
-          !state.showLauncher
-        ) {
-          // prevent closing the tab accidentally
-          e.preventDefault();
-        }
-      }
-      if (e.key === "Meta" && !state.showx11 && !state.showSetup) {
-        state.showLauncher = !state.showLauncher;
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    },
-    {
-      capture: true,
-    },
-  );
-
-  let loadedFrame = false;
-  useChange(this.shown, (x: Tabs) => {
-    if (x === "code" && !loadedFrame) {
-      proxyLoadPage(
-        this.codeframe,
-        "http://localhost:8080",
-        "http://localhost:8080",
-      );
-      loadedFrame = true;
-    }
-  });
-
-  return (
-    <div class:visible={use(this.show)}>
-      <Dialog
-        headline="Apps"
-        bind:open={use(state.showLauncher)}
-        closeOnClick={true}
-      >
-        {launcher}
-        <div class="apps-actions">
-          <Button type="tonal" on:click={() => (state.showLauncher = false)}>
-            Close
-          </Button>
-        </div>
-      </Dialog>
-
-      <Nav bind:shown={use(this.shown)} />
-      <div class="content" bind:this={use(this.content)}>
-        <iframe
-          id="codeframe"
-          bind:this={use(this.codeframe)}
-          class:visible={use(this.shown, (x) => x === "code")}
-        />
-        <div
-          id="scrcpy-container"
-          class:visible={use(this.shown, (x) => x === "scrcpy")}
-        >
-          {use(state.scrcpy)}
-        </div>
-        {use(this.shown, (x: Tabs) => {
-          if (x !== "scrcpy" && state.scrcpy) {
-            state.showx11 = false;
-          }
-
-          if (x === "scrcpy") {
-            // ...
-          } else if (x === "terminal") {
-            return state.terminal;
-          } else if (x === "code") {
-            //...
-          } else if (x === "settings") {
-            return <Settings />;
-          }
-        })}
-      </div>
-    </div>
-  );
-};
+`
+let scheme = new DynamicScheme({
+	sourceColorHct: Hct.fromInt(0x00c875a1),
+	contrastLevel: 0,
+	specVersion: "2025",
+	variant: Variant.VIBRANT,
+	isDark: true,
+});
 
 export type Log = { color: string; log: string };
 export const loglisteners: ((log: Log) => void)[] = [];
@@ -1013,27 +1023,7 @@ proxyConsole("warn", "var(--warning)");
 proxyConsole("log", "var(--fg)");
 proxyConsole("info", "var(--info)");
 proxyConsole("debug", "var(--fg4)");
-export const LogView: Component<{ scrolling: boolean }> = function () {
-  this.css = `
-		min-height: 0;
-		flex: 1;
-		font-family: var(--font-mono);
-
-		.log {
-			word-break: break-all;
-		}
-
-		::-webkit-scrollbar {
-			width: 10px;
-		}
-		::-webkit-scrollbar-track {
-			background: var(--surface3);
-		}
-		::-webkit-scrollbar-thumb {
-			background: var(--surface6);
-		}
-	`;
-
+export const LogView: Component<{ scrolling: boolean }> = function (cx) {
   const create = (color: string, log: string) => {
     const el = document.createElement("div");
     el.classList.add("log");
@@ -1042,8 +1032,8 @@ export const LogView: Component<{ scrolling: boolean }> = function () {
     return el;
   };
 
-  this.mount = () => {
-    const logroot = this.root as HTMLElement;
+  cx.mount = () => {
+    const logroot = cx.root as HTMLElement;
     const frag = document.createDocumentFragment();
 
     loglisteners.push((x) => frag.append(create(x.color, x.log)));
@@ -1058,9 +1048,31 @@ export const LogView: Component<{ scrolling: boolean }> = function () {
   return <div style={this.scrolling ? "overflow: auto" : "overflow: hidden"} />;
 };
 
+LogView.style = css`
+    :scope {
+      min-height: 0;
+      flex: 1;
+      font-family: var(--font-mono);
+    }
+
+		.log {
+			word-break: break-all;
+		}
+
+		::-webkit-scrollbar {
+			width: 10px;
+		}
+		::-webkit-scrollbar-track {
+			background: var(--surface3);
+		}
+		::-webkit-scrollbar-thumb {
+			background: var(--surface6);
+		}
+`;
+
 const App: Component<{}, {}> = function () {
   state.showSetup = true;
-  let main = <Main show={use(state.showSetup, (x) => !x)} />;
+  let main = <Main show={use(state.showSetup).map((x) => !x)} />;
   let setup = (
     <Setup
       on:connect={async (opts) => {
@@ -1073,9 +1085,10 @@ const App: Component<{}, {}> = function () {
 
   return (
     <div id="app">
-      <StyleFromParams scheme="vibrant" contrast={0} color="CBA6F7" />
-      {use(state.showSetup, (x) => (x ? setup : ""))}
-      {main}
+      <SchemeStyles scheme={scheme} motion="expressive">
+        {use(state.showSetup).map((x) => (x ? setup : ""))}
+        {main}
+      </SchemeStyles>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import "dreamland";
+import { Component, css, ComponentInstance } from "dreamland/core";
 import { AdbSubprocessProtocol } from '@yume-chan/adb';
 import { Button, Card, Icon } from 'm3-dreamland';
 import { mgr, store } from './main';
@@ -16,25 +16,15 @@ type Tab = {
 	id: number,
 	process: AdbSubprocessProtocol,
 	title: string,
-	component: ComponentElement<typeof TerminalTab>,
+	component: ComponentInstance<typeof TerminalTab>,
 };
 
 const TerminalTab: Component<{
 	process: AdbSubprocessProtocol,
 }, {
 	term: HTMLElement,
-}> = function() {
-	this.css = `
-		width: 100%;
-		height: 100%;
-		background-color: #000;
-		#terminal {
-			width: 100%;
-			height: 100%;
-		}
-	`;
-
-	this.mount = async () => {
+}> = function(cx) {
+	cx.mount = async () => {
 		const term = new XtermTerminal();
 		const fit = new FitAddon();
 		const clip = new ClipboardAddon();
@@ -67,9 +57,21 @@ const TerminalTab: Component<{
 	};
 
 	return <div>
-		<div bind:this={use(this.term)} id="terminal"></div>
+		<div this={use(this.term)} id="terminal"></div>
 	</div>
 };
+
+TerminalTab.style = css`
+	:scope {
+		width: 100%;
+		height: 100%;
+		background-color: #000;
+	}
+	#terminal {
+		width: 100%;
+		height: 100%;
+	}
+`;
 
 export const Terminal: Component<{}, {
 	processes: Tab[],
@@ -81,12 +83,98 @@ export const Terminal: Component<{}, {
 	this.activeTab = 0;
 	this.showMenu = false;
 
-	this.css = `
-		display: flex;
-		flex-direction: column;
-		height: 100%;
-		gap: 0.5em;
-		padding: 0.5em;
+	this.start = async (shell: string) => {
+		let process: AdbSubprocessProtocol;
+		switch (shell) {
+			case "sh":
+				process = await mgr.adb.subprocess.shell(store.defaultshell);
+				break;
+			case "termux":
+				process = await mgr.termuxShell("TERM=xterm-256color " + store.defaultshelltermux);
+				break;
+			case "proot":
+				process = await mgr.termuxShell(store.prootcmd.replace("%distro", store.distro).replace("%cmd", store.defaultshellproot));
+				break;
+			default:
+				throw new Error("Unknown shell type");
+		}
+		const component = <TerminalTab process={process} />;
+		this.processes.push({
+			id: Date.now(),
+			process,
+			title: `Terminal ${this.processes.length + 1} (${shell})`,
+			component,
+		});
+		this.processes = this.processes;
+		this.activeTab = this.processes.length - 1;
+		this.showMenu = false;
+	};
+
+	return (
+		<div>
+			<div class="tabs">
+				{use(this.processes).mapEach((tab, index) => (
+					<div
+						class="tab"
+						class:active={use(this.activeTab).map((x) => x === index)}
+						on:click={() => this.activeTab = index}
+					>
+						<Icon icon={iconTerminal} />
+						{tab.title}
+						<button
+							class="close-button"
+							on:click={(e: MouseEvent) => {
+								e.stopPropagation();
+								tab.process.kill();
+								this.processes = this.processes.filter(t => t.id !== tab.id);
+								if (this.activeTab >= this.processes.length) {
+									this.activeTab = Math.max(0, this.processes.length - 1);
+								}
+							}}
+						>
+							<Icon
+								icon={iconClose}
+							/>
+						</button>
+					</div>
+				))}
+				<div class="add-menu">
+					<Button
+						variant="tonal"
+						on:click={() => this.showMenu = !this.showMenu}
+					>
+						<Icon icon={iconAdd} />
+					</Button>
+					{use(this.showMenu).andThen((
+						<div class="menu">
+							<Card variant="elevated">
+								<div class="menu-item" on:click={() => this.start("sh")}>Shell</div>
+								<div class="menu-item" on:click={() => this.start("termux")}>Termux</div>
+								<div class="menu-item" on:click={() => this.start("debian")}>{store.distro.replace(/(^|\s)[a-z]/gi, l => l.toUpperCase())}</div>
+							</Card>
+						</div>
+					), null)}
+				</div>
+			</div>
+			<div class="terminal">
+				{use(this.processes).mapEach((tab, index) => (
+					<div class:active={use(this.activeTab).map((x) => x === index)}>
+						{tab.component}
+					</div>
+				))}
+			</div>
+		</div>
+	);
+};
+
+Terminal.style = css`
+		:scope {
+			display: flex;
+			flex-direction: column;
+			height: 100%;
+			gap: 0.5em;
+			padding: 0.5em;
+		}
 
 		.tabs {
 			display: flex;
@@ -158,88 +246,4 @@ export const Terminal: Component<{}, {
 			border: none;
 			padding: 0;
 		}
-	`;
-
-	this.start = async (shell: string) => {
-		let process: AdbSubprocessProtocol;
-		switch (shell) {
-			case "sh":
-				process = await mgr.adb.subprocess.shell(store.defaultshell);
-				break;
-			case "termux":
-				process = await mgr.termuxShell("TERM=xterm-256color " + store.defaultshelltermux);
-				break;
-			case "proot":
-				process = await mgr.termuxShell(store.prootcmd.replace("%distro", store.distro).replace("%cmd", store.defaultshellproot));
-				break;
-			default:
-				throw new Error("Unknown shell type");
-		}
-		const component = <TerminalTab process={process} />;
-		this.processes.push({
-			id: Date.now(),
-			process,
-			title: `Terminal ${this.processes.length + 1} (${shell})`,
-			component,
-		});
-		this.processes = this.processes;
-		this.activeTab = this.processes.length - 1;
-		this.showMenu = false;
-	};
-
-	return (
-		<div>
-			<div class="tabs">
-				{use(this.processes, (tabs) => tabs.map((tab, index) => (
-					<div
-						class="tab"
-						class:active={use(this.activeTab, x => x === index)}
-						on:click={() => this.activeTab = index}
-					>
-						<Icon icon={iconTerminal} />
-						{tab.title}
-						<button
-							class="close-button"
-							on:click={(e: MouseEvent) => {
-								e.stopPropagation();
-								tab.process.kill();
-								this.processes = this.processes.filter(t => t.id !== tab.id);
-								if (this.activeTab >= this.processes.length) {
-									this.activeTab = Math.max(0, this.processes.length - 1);
-								}
-							}}
-						>
-							<Icon
-								icon={iconClose}
-							/>
-						</button>
-					</div>
-				)))}
-				<div class="add-menu">
-					<Button
-						type="tonal"
-						on:click={() => this.showMenu = !this.showMenu}
-					>
-						<Icon icon={iconAdd} />
-					</Button>
-					{use(this.showMenu, (show) => show && (
-						<div class="menu">
-							<Card type="elevated">
-								<div class="menu-item" on:click={() => this.start("sh")}>Shell</div>
-								<div class="menu-item" on:click={() => this.start("termux")}>Termux</div>
-								<div class="menu-item" on:click={() => this.start("debian")}>{store.distro.replace(/(^|\s)[a-z]/gi, l => l.toUpperCase())}</div>
-							</Card>
-						</div>
-					) || "")}
-				</div>
-			</div>
-			<div class="terminal">
-				{use(this.processes, (tabs) => tabs.map((tab, index) => (
-					<div class:active={use(this.activeTab, x => x === index)}>
-						{tab.component}
-					</div>
-				)))}
-			</div>
-		</div>
-	);
-};
+`

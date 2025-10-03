@@ -1,3 +1,4 @@
+import { Component, css } from "dreamland/core";
 import { AdbScrcpyClient } from "@yume-chan/adb-scrcpy";
 import { VideoFrameRenderer } from "@yume-chan/scrcpy-decoder-webcodecs";
 import { Float32PcmPlayer } from '@yume-chan/pcm-player'
@@ -41,21 +42,7 @@ export const Scrcpy: Component<{
 	client: AdbScrcpyClient,
 }, {
 	expanded: boolean,
-}, {}> = function() {
-	this.css = `
-	height: 100%;
-	width: 100%;
-	background-color: red;
-	overflow: hidden;
-	display: flex;
-	position: relative;
-
-	video {
-		outline: none;
-	  /* height: 100%; */
-	}
-`
-
+}, {}> = function(cx) {
 	let screenWidth = 0;
 	let screenHeight = 0;
 
@@ -91,7 +78,7 @@ export const Scrcpy: Component<{
 	const startVideo = async () => {
 		const { metadata: videoMetadata, stream: videoPacketStream } = await this.client.videoStream!;
 		const renderer = createVideoFrameRenderer();
-		this.root.appendChild(renderer.element);
+		cx.root.appendChild(renderer.element);
 		const decoder = new WebCodecsVideoDecoder({
 			codec: videoMetadata.codec,
 			renderer: renderer.renderer,
@@ -303,23 +290,33 @@ export const Scrcpy: Component<{
 	}
 
 
-	this.mount = async () => {
+	cx.mount = async () => {
 		let renderer = await startVideo();
 		await startAudio();
 		await startController(renderer.element as HTMLVideoElement, this.client.controller!);
 		// @ts-ignore
 		window.renderer = renderer;
-
-
-
-
 	}
 
 	return (
-		<div>
-		</div>
+		<div></div>
 	)
 }
+Scrcpy.style = css`
+	:scope {
+		height: 100%;
+		width: 100%;
+		background-color: red;
+		overflow: hidden;
+		display: flex;
+		position: relative;
+	}
+
+	video {
+		outline: none;
+	  /* height: 100%; */
+	}
+`
 function getPointer(el: HTMLVideoElement, clientX: number, clientY: number) {
 	const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 	const screenWidth = el.width

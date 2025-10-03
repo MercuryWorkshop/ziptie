@@ -20,10 +20,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
-    "jsx": "react",
-    "jsxFactory": "h",
-    "jsxFragmentFactory": "Fragment",
-    "types": ["dreamland"]
+		"jsx": "react-jsx",
+		"jsxImportSource": "dreamland"
   },
   "include": ["src"]
 }
